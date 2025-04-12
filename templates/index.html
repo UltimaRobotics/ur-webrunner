@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenWRT Management Interface</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-wifi"></i> OpenWRT Management Interface</h1>
+        <button id="terminal-btn" class="terminal-btn"><i class="fas fa-terminal"></i> Terminal</button>
+    </div>
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <ul class="sidebar-menu">
+                <li data-tab="dashboard" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
+                <li data-tab="system"><i class="fas fa-server"></i> System</li>
+                <li data-tab="network"><i class="fas fa-network-wired"></i> Network</li>
+                <li data-tab="services"><i class="fas fa-cogs"></i> Services</li>
+                <li data-tab="firewall"><i class="fas fa-shield-alt"></i> Firewall</li>
+                <li data-tab="logs"><i class="fas fa-list"></i> Logs</li>
+                <li id="terminal-menu-item"><i class="fas fa-terminal"></i> Terminal</li>
+            </ul>
+        </div>
+        
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="card">
+                    <h2><i class="fas fa-info-circle"></i> Device Information</h2>
+                    <p><strong>Client IP:</strong> <span id="clientIP">{{client_ip}}</span></p>
+                    <p><strong>Server Time:</strong> <span id="serverTime">{{server_time}}</span></p>
+                    <p><strong>OpenWRT Version:</strong> <span id="openwrtVersion">{{openwrt_version}}</span></p>
+                    <p><strong>Kernel Version:</strong> <span id="kernelVersion">{{kernel_version}}</span></p>
+                    <p><strong>Uptime:</strong> <span id="uptimeValue">{{uptime}}</span></p>
+                </div>
+                
+                <!-- Real-time Metrics Section -->
+                <div class="card">
+                    <h2><i class="fas fa-chart-line"></i> Real-time System Metrics</h2>
+                    
+                    <div class="metrics-grid">
+                        <!-- CPU Metric Card -->
+                        <div class="metric-card">
+                            <i class="fas fa-microchip metric-icon"></i>
+                            <div class="metric-value" id="cpuValue">0%</div>
+                            <div class="metric-label">CPU Usage</div>
+                            <div class="progress-container">
+                                <div class="progress-bar cpu" id="cpuProgressBar" style="width: 0%"></div>
+                            </div>
+                            <div style="height: 150px; width: 100%; margin-top: 15px;">
+                                <canvas id="cpuChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Memory Metric Card -->
+                        <div class="metric-card">
+                            <i class="fas fa-memory metric-icon"></i>
+                            <div class="metric-value" id="memoryValue">0%</div>
+                            <div class="metric-label">Memory Usage</div>
+                            <div class="metric-label" id="memoryDetails">0MB / 0MB</div>
+                            <div class="progress-container">
+                                <div class="progress-bar memory" id="memoryProgressBar" style="width: 0%"></div>
+                            </div>
+                            <div style="height: 150px; width: 100%; margin-top: 15px;">
+                                <canvas id="memoryChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Storage Metric Card -->
+                        <div class="metric-card">
+                            <i class="fas fa-hdd metric-icon"></i>
+                            <div class="metric-value" id="storageValue">0%</div>
+                            <div class="metric-label">Storage Usage</div>
+                            <div class="metric-label" id="storageDetails">0MB / 0MB</div>
+                            <div class="progress-container">
+                                <div class="progress-bar storage" id="storageProgressBar" style="width: 0%"></div>
+                            </div>
+                            <div style="height: 150px; width: 100%; margin-top: 15px;">
+                                <canvas id="storageChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Bandwidth Metric Card -->
+                        <div class="metric-card">
+                            <i class="fas fa-exchange-alt metric-icon"></i>
+                            <div class="metric-value">
+                                <span id="downloadValue">0 KB/s</span> <i class="fas fa-arrow-down" style="color: #4CAF50;"></i>
+                            </div>
+                            <div class="metric-value">
+                                <span id="uploadValue">0 KB/s</span> <i class="fas fa-arrow-up" style="color: #2196F3;"></i>
+                            </div>
+                            <div class="metric-label">Network Bandwidth</div>
+                            <div style="height: 150px; width: 100%; margin-top: 15px;">
+                                <canvas id="bandwidthChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Connection Status -->
+                <div class="card">
+                    <h2><i class="fas fa-plug"></i> Connection Status</h2>
+                    
+                    <div class="connection-status">
+                        <span class="status-indicator status-offline" id="internetStatus"></span>
+                        <strong>Internet Connection:</strong> 
+                        <span id="internetStatusText" style="margin-left: 10px; color: #f44336;">Disconnected</span>
+                    </div>
+                    
+                    <div class="connection-status">
+                        <span class="status-indicator status-offline" id="ultimaStatus"></span>
+                        <strong>Ultima Robotics Server:</strong> 
+                        <span id="ultimaStatusText" style="margin-left: 10px; color: #f44336;">Disconnected</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Tab -->
+            <div id="system" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-server"></i> System Information</h2>
+                    <div id="systemInfo">
+                        {{system_info}}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Network Tab -->
+            <div id="network" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-network-wired"></i> Network Configuration</h2>
+                    <div id="networkInfo">
+                        {{network_info}}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Services Tab -->
+            <div id="services" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-cogs"></i> Services Management</h2>
+                    <p>Services management would be shown here.</p>
+                </div>
+            </div>
+            
+            <!-- Firewall Tab -->
+            <div id="firewall" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-shield-alt"></i> Firewall Settings</h2>
+                    <p>Firewall settings would be shown here.</p>
+                </div>
+            </div>
+            
+            <!-- Logs Tab -->
+            <div id="logs" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-list"></i> System Logs</h2>
+                    <pre id="logContent">Loading logs...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Terminal Popup -->
+    <div class="overlay" id="overlay"></div>
+    <div class="terminal-popup" id="terminal">
+        <div class="terminal-header">
+            <h3 class="terminal-title"><i class="fas fa-terminal"></i> OpenWRT Terminal</h3>
+            <div class="terminal-controls">
+                <div class="terminal-control terminal-minimize" id="terminal-minimize"></div>
+                <div class="terminal-control terminal-maximize" id="terminal-maximize"></div>
+                <div class="terminal-control terminal-close" id="terminal-close"></div>
+            </div>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+            <div class="terminal-prompt">Welcome to OpenWRT Terminal</div>
+            <div class="terminal-prompt">Type 'help' for a list of common commands</div>
+            
+            {{#terminal_history}}
+            <div class="terminal-prompt">$ {{command}}</div>
+            <div class="command-output {{status_class}}">{{output}}</div>
+            {{/terminal_history}}
+        </div>
+        <form method="GET" action="/" class="terminal-form" id="terminal-form">
+            <input type="text" name="command" id="commandInput" placeholder="Enter command..." autocomplete="off">
+            <button type="submit"><i class="fas fa-play"></i> Execute</button>
+        </form>
+    </div>
+    
+    <script src="/js/main.js"></script>
+</body>
+</html>

@@ -31,7 +31,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management 0.0.0.0 5000"
+args = "make clean && make && ./openwrt_management 0.0.0.0 5000"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -49,7 +49,7 @@ task = "shell.exec"
 args = "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management"
 
 [deployment]
-run = ["sh", "-c", "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management 0.0.0.0 5000"]
+run = ["sh", "-c", "make clean && make && ./openwrt_management 0.0.0.0 5000"]
 
 [[ports]]
 localPort = 5000

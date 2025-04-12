@@ -2,20 +2,85 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <sys/statvfs.h>
+#include <sys/sysinfo.h>
 
 #define DEFAULT_PORT 5000
 #define BUFFER_SIZE 65536  // Larger buffer for complex HTML
 #define MAX_COMMAND_SIZE 2048
 #define MAX_HISTORY 10
+#define MAX_PATH_LENGTH 256
+#define TEMPLATE_MAX_SIZE 65536
+#define ULTIMA_SERVER "example.ultimarobotics.com"
 
 // Global command history
 char command_history[MAX_HISTORY][MAX_COMMAND_SIZE];
 int history_count = 0;
+
+// Content types for different file extensions
+typedef struct {
+    const char *extension;
+    const char *mime_type;
+} content_type_mapping;
+
+content_type_mapping content_types[] = {
+    {".html", "text/html"},
+    {".css", "text/css"},
+    {".js", "application/javascript"},
+    {".json", "application/json"},
+    {".png", "image/png"},
+    {".jpg", "image/jpeg"},
+    {".jpeg", "image/jpeg"},
+    {".gif", "image/gif"},
+    {".svg", "image/svg+xml"},
+    {".ico", "image/x-icon"},
+    {NULL, NULL}
+};
+
+// Structure for system metrics
+typedef struct {
+    // CPU
+    float cpu_usage;
+    
+    // Memory
+    unsigned long total_memory;
+    unsigned long used_memory;
+    float memory_usage;
+    
+    // Storage
+    unsigned long total_storage;
+    unsigned long free_storage;
+    unsigned long used_storage;
+    float storage_usage;
+    
+    // Bandwidth (in KB/s)
+    float download_rate;
+    float upload_rate;
+    unsigned long rx_bytes;
+    unsigned long tx_bytes;
+    unsigned long last_rx_bytes;
+    unsigned long last_tx_bytes;
+    time_t last_bandwidth_check;
+    
+    // Connection status
+    int internet_connected;
+    int ultima_server_connected;
+} system_metrics;
+
+// Global metrics storage
+system_metrics metrics;
 
 // Function to URL decode a string
 void url_decode(char *dst, const char *src) {
@@ -136,277 +201,774 @@ char* execute_command(const char *command, int *exit_status) {
     return output;
 }
 
-// Get system information for OpenWRT
-char* get_system_info() {
-    static char info[4096];
-    
-    sprintf(info, "<h3>System Information</h3>");
-    
-    // Add placeholder system info for now
-    strcat(info, "<p>This is a placeholder for OpenWRT system information</p>");
-    strcat(info, "<p>In a real implementation, this would show CPU, memory, and other hardware details.</p>");
-    
-    return info;
+// Function to check connectivity to internet
+int check_internet_connectivity() {
+    struct hostent *host = gethostbyname("google.com");
+    return (host != NULL);
 }
 
-// Get network information for OpenWRT
-char* get_network_info() {
-    static char info[4096];
-    
-    sprintf(info, "<h3>Network Information</h3>");
-    
-    // Add placeholder network info for now
-    strcat(info, "<p>This is a placeholder for OpenWRT network information</p>");
-    strcat(info, "<p>In a real implementation, this would show interfaces, IP addresses, etc.</p>");
-    
-    return info;
+// Function to check connectivity to Ultima Robotics server
+int check_ultima_server_connectivity() {
+    struct hostent *host = gethostbyname(ULTIMA_SERVER);
+    return (host != NULL);
 }
 
-// Function to generate dynamic HTML content with terminal popup
-void generate_dynamic_html(char *buffer, const char *client_ip, const char *command, const char *cmd_output, int exit_status) {
-    time_t now;
-    time(&now);
+// Function to get CPU usage
+float get_cpu_usage() {
+    FILE *fp = fopen("/proc/stat", "r");
+    if (fp == NULL) {
+        return 0.0;
+    }
     
-    char *system_info = get_system_info();
-    char *network_info = get_network_info();
+    static unsigned long long int prev_total = 0, prev_idle = 0;
+    unsigned long long int user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+    char cpu[10];
     
-    // Start with HTTP headers and basic HTML
-    int offset = sprintf(buffer, 
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
-        "\r\n"
-        "<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head>\n"
-        "    <title>OpenWRT Management Interface</title>\n"
-        "    <style>\n"
-        "        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }\n"
-        "        .header { background: #0066cc; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }\n"
-        "        .header h1 { margin: 0; }\n"
-        "        .container { display: flex; min-height: calc(100vh - 60px); }\n"
-        "        .sidebar { width: 250px; background: white; border-right: 1px solid #ddd; }\n"
-        "        .sidebar ul { list-style-type: none; padding: 0; margin: 0; }\n"
-        "        .sidebar li { padding: 10px 20px; border-bottom: 1px solid #ddd; cursor: pointer; }\n"
-        "        .sidebar li:hover { background: #f8f9fa; }\n"
-        "        .sidebar li.active { background: #0066cc; color: white; }\n"
-        "        .content { flex: 1; padding: 20px; }\n"
-        "        .card { background: white; border-radius: 4px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }\n"
-        "        .card h2 { margin-top: 0; color: #0066cc; border-bottom: 1px solid #ddd; padding-bottom: 10px; }\n"
-        "        .terminal-btn { background: #0066cc; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }\n"
-        "        .tab-content { display: none; }\n"
-        "        .tab-content.active { display: block; }\n"
-        "        .terminal-popup { display: none; position: fixed; top: 50%%; left: 50%%; transform: translate(-50%%, -50%%); width: 80%%; height: 80%%; background: #1e1e1e; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); overflow: hidden; z-index: 1000; }\n"
-        "        .terminal-header { background: #333; color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }\n"
-        "        .terminal-controls { display: flex; gap: 5px; }\n"
-        "        .terminal-control { width: 12px; height: 12px; border-radius: 50%%; cursor: pointer; }\n"
-        "        .terminal-minimize { background: #ffbd4c; }\n"
-        "        .terminal-maximize { background: #00ca56; }\n"
-        "        .terminal-close { background: #ff5f56; }\n"
-        "        .terminal-body { padding: 15px; color: #f0f0f0; font-family: monospace; height: calc(100%% - 120px); overflow-y: auto; }\n"
-        "        .terminal-prompt { color: #4CAF50; white-space: pre-wrap; margin-bottom: 5px; }\n"
-        "        .terminal-form { display: flex; padding: 10px 15px; background: #2d2d2d; border-top: 1px solid #444; }\n"
-        "        .terminal-form input { flex-grow: 1; background: #2d2d2d; border: none; color: #f0f0f0; padding: 8px; font-family: monospace; }\n"
-        "        .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }\n"
-        "        .command-output { margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap; }\n"
-        "        .command-success { color: #4CAF50; }\n"
-        "        .command-error { color: #f44336; }\n"
-        "    </style>\n"
-        "</head>\n"
-        "<body>\n"
-        "    <div class=\"header\">\n"
-        "        <h1>OpenWRT Management Interface</h1>\n"
-        "        <button class=\"terminal-btn\" onclick=\"openTerminal()\">Terminal</button>\n"
-        "    </div>\n"
-        "    \n"
-        "    <div class=\"container\">\n"
-        "        <div class=\"sidebar\">\n"
-        "            <ul>\n"
-        "                <li class=\"active\" onclick=\"showTab('dashboard')\">Dashboard</li>\n"
-        "                <li onclick=\"showTab('system')\">System</li>\n"
-        "                <li onclick=\"showTab('network')\">Network</li>\n"
-        "                <li onclick=\"showTab('services')\">Services</li>\n"
-        "                <li onclick=\"showTab('firewall')\">Firewall</li>\n"
-        "                <li onclick=\"openTerminal()\">Terminal</li>\n"
-        "            </ul>\n"
-        "        </div>\n"
-        "        \n"
-        "        <div class=\"content\">\n"
-        "            <div id=\"dashboard\" class=\"tab-content active\">\n"
-        "                <div class=\"card\">\n"
-        "                    <h2>Dashboard</h2>\n"
-        "                    <p>Welcome to the OpenWRT Management Interface.</p>\n"
-        "                    <p><strong>Client IP:</strong> %s</p>\n"
-        "                    <p><strong>Server Time:</strong> %s</p>\n"
-        "                    <button class=\"terminal-btn\" onclick=\"openTerminal()\">Open Terminal</button>\n"
-        "                </div>\n"
-        "                \n"
-        "                <div class=\"card\">\n"
-        "                    <h2>System Status</h2>\n"
-        "                    %s\n"
-        "                </div>\n"
-        "                \n"
-        "                <div class=\"card\">\n"
-        "                    <h2>Network Status</h2>\n"
-        "                    %s\n"
-        "                </div>\n"
-        "            </div>\n"
-        "            \n"
-        "            <div id=\"system\" class=\"tab-content\">\n"
-        "                <div class=\"card\">\n"
-        "                    <h2>System Information</h2>\n"
-        "                    <p>System information and management would be shown here.</p>\n"
-        "                    %s\n"
-        "                </div>\n"
-        "            </div>\n"
-        "            \n"
-        "            <div id=\"network\" class=\"tab-content\">\n"
-        "                <div class=\"card\">\n"
-        "                    <h2>Network Configuration</h2>\n"
-        "                    <p>Network configuration would be shown here.</p>\n"
-        "                    %s\n"
-        "                </div>\n"
-        "            </div>\n"
-        "            \n"
-        "            <div id=\"services\" class=\"tab-content\">\n"
-        "                <div class=\"card\">\n"
-        "                    <h2>Services Management</h2>\n"
-        "                    <p>Services management would be shown here.</p>\n"
-        "                </div>\n"
-        "            </div>\n"
-        "            \n"
-        "            <div id=\"firewall\" class=\"tab-content\">\n"
-        "                <div class=\"card\">\n"
-        "                    <h2>Firewall Settings</h2>\n"
-        "                    <p>Firewall settings would be shown here.</p>\n"
-        "                </div>\n"
-        "            </div>\n"
-        "        </div>\n"
-        "    </div>\n"
-        "    \n"
-        "    <!-- Terminal Popup -->\n"
-        "    <div class=\"overlay\" id=\"overlay\"></div>\n"
-        "    <div class=\"terminal-popup\" id=\"terminal\">\n"
-        "        <div class=\"terminal-header\">\n"
-        "            <h3>OpenWRT Terminal</h3>\n"
-        "            <div class=\"terminal-controls\">\n"
-        "                <div class=\"terminal-control terminal-minimize\" onclick=\"minimizeTerminal()\"></div>\n"
-        "                <div class=\"terminal-control terminal-maximize\" onclick=\"maximizeTerminal()\"></div>\n"
-        "                <div class=\"terminal-control terminal-close\" onclick=\"closeTerminal()\"></div>\n"
-        "            </div>\n"
-        "        </div>\n"
-        "        <div class=\"terminal-body\" id=\"terminal-body\">\n"
-        "            <div class=\"terminal-prompt\">Welcome to OpenWRT Terminal</div>\n"
-        "            <div class=\"terminal-prompt\">Type 'help' for a list of common commands</div>\n",
-        client_ip, ctime(&now), system_info, network_info, system_info, network_info);
+    if (fscanf(fp, "%s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+               cpu, &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guest_nice) != 11) {
+        fclose(fp);
+        return 0.0;
+    }
     
-    // Add command history if any
-    if (history_count > 0) {
-        for (int i = 0; i < history_count; i++) {
-            offset += sprintf(buffer + offset,
-                "            <div class=\"terminal-prompt\">$ %s</div>\n",
-                command_history[i]);
-            
-            // Add the current command output if this is the most recent command
-            if (i == history_count - 1 && command && strcmp(command, command_history[i]) == 0 && cmd_output) {
-                offset += sprintf(buffer + offset,
-                    "            <div class=\"command-output %s\">%s</div>\n",
-                    exit_status == 0 ? "command-success" : "command-error",
-                    cmd_output);
+    fclose(fp);
+    
+    unsigned long long int total = user + nice + system + idle + iowait + irq + softirq + steal;
+    unsigned long long int total_diff = total - prev_total;
+    unsigned long long int idle_diff = idle - prev_idle;
+    
+    float cpu_usage = 0.0;
+    if (total_diff != 0) {
+        cpu_usage = 100.0 * (1.0 - ((float)idle_diff / (float)total_diff));
+    }
+    
+    prev_total = total;
+    prev_idle = idle;
+    
+    return cpu_usage;
+}
+
+// Function to get memory usage
+void get_memory_usage(unsigned long *total, unsigned long *used, float *percentage) {
+    struct sysinfo info;
+    
+    if (sysinfo(&info) != 0) {
+        *total = 0;
+        *used = 0;
+        *percentage = 0.0;
+        return;
+    }
+    
+    *total = info.totalram / 1024 / 1024;  // Convert to MB
+    *used = (info.totalram - info.freeram) / 1024 / 1024;  // Convert to MB
+    *percentage = 100.0 * ((float)*used / (float)*total);
+}
+
+// Function to get storage usage
+void get_storage_usage(unsigned long *total, unsigned long *free, unsigned long *used, float *percentage) {
+    struct statvfs fs_info;
+    
+    if (statvfs("/", &fs_info) != 0) {
+        *total = 0;
+        *free = 0;
+        *used = 0;
+        *percentage = 0.0;
+        return;
+    }
+    
+    *total = (fs_info.f_blocks * fs_info.f_frsize) / 1024 / 1024;  // Convert to MB
+    *free = (fs_info.f_bfree * fs_info.f_frsize) / 1024 / 1024;    // Convert to MB
+    *used = *total - *free;
+    *percentage = 100.0 * ((float)*used / (float)*total);
+}
+
+// Function to update network bandwidth
+void update_bandwidth() {
+    time_t now = time(NULL);
+    FILE *fp = fopen("/proc/net/dev", "r");
+    
+    if (fp == NULL) {
+        metrics.download_rate = 0;
+        metrics.upload_rate = 0;
+        return;
+    }
+    
+    // Skip the first two lines (headers)
+    char line[256];
+    fgets(line, sizeof(line), fp);
+    fgets(line, sizeof(line), fp);
+    
+    unsigned long rx_bytes = 0;
+    unsigned long tx_bytes = 0;
+    
+    // Read network interfaces
+    while (fgets(line, sizeof(line), fp)) {
+        char *pos = strchr(line, ':');
+        if (pos) {
+            pos++;
+            unsigned long interface_rx, interface_tx;
+            if (sscanf(pos, "%lu %*u %*u %*u %*u %*u %*u %*u %lu", &interface_rx, &interface_tx) == 2) {
+                // Skip loopback interface
+                if (strstr(line, "lo:") == NULL) {
+                    rx_bytes += interface_rx;
+                    tx_bytes += interface_tx;
+                }
             }
         }
     }
     
-    // Add the command output if command is not in history but was just executed
-    if (command && command[0] && cmd_output && 
-        (history_count == 0 || strcmp(command, command_history[history_count-1]) != 0)) {
-        offset += sprintf(buffer + offset,
-            "            <div class=\"terminal-prompt\">$ %s</div>\n"
-            "            <div class=\"command-output %s\">%s</div>\n",
-            command, 
-            exit_status == 0 ? "command-success" : "command-error",
-            cmd_output);
+    fclose(fp);
+    
+    // Calculate bandwidth if we have previous values
+    if (metrics.last_bandwidth_check > 0) {
+        double time_diff = difftime(now, metrics.last_bandwidth_check);
+        
+        if (time_diff > 0) {
+            // Calculate download rate (KB/s)
+            if (rx_bytes >= metrics.last_rx_bytes) {
+                metrics.download_rate = (rx_bytes - metrics.last_rx_bytes) / 1024.0 / time_diff;
+            } else {
+                // Counter reset
+                metrics.download_rate = 0;
+            }
+            
+            // Calculate upload rate (KB/s)
+            if (tx_bytes >= metrics.last_tx_bytes) {
+                metrics.upload_rate = (tx_bytes - metrics.last_tx_bytes) / 1024.0 / time_diff;
+            } else {
+                // Counter reset
+                metrics.upload_rate = 0;
+            }
+        }
     }
     
-    // Add the rest of the HTML
-    sprintf(buffer + offset,
-        "        </div>\n"
-        "        <form method=\"GET\" action=\"/\" class=\"terminal-form\">\n"
-        "            <input type=\"text\" name=\"command\" id=\"commandInput\" placeholder=\"Enter command...\" autocomplete=\"off\">\n"
-        "            <button type=\"submit\">Execute</button>\n"
-        "        </form>\n"
-        "    </div>\n"
-        "    \n"
-        "    <script>\n"
-        "        // Show initial tab\n"
-        "        function showTab(tabId) {\n"
-        "            // Hide all tab contents\n"
-        "            var tabContents = document.getElementsByClassName('tab-content');\n"
-        "            for (var i = 0; i < tabContents.length; i++) {\n"
-        "                tabContents[i].classList.remove('active');\n"
-        "            }\n"
-        "            \n"
-        "            // Show selected tab content\n"
-        "            document.getElementById(tabId).classList.add('active');\n"
-        "            \n"
-        "            // Update active menu item\n"
-        "            var menuItems = document.querySelectorAll('.sidebar li');\n"
-        "            for (var i = 0; i < menuItems.length; i++) {\n"
-        "                menuItems[i].classList.remove('active');\n"
-        "                if (menuItems[i].innerText.toLowerCase() === tabId.toLowerCase()) {\n"
-        "                    menuItems[i].classList.add('active');\n"
-        "                }\n"
-        "            }\n"
-        "        }\n"
-        "        \n"
-        "        // Terminal functions\n"
-        "        function openTerminal() {\n"
-        "            document.getElementById('terminal').style.display = 'block';\n"
-        "            document.getElementById('overlay').style.display = 'block';\n"
-        "            document.getElementById('commandInput').focus();\n"
-        "            var terminalBody = document.getElementById('terminal-body');\n"
-        "            terminalBody.scrollTop = terminalBody.scrollHeight;\n"
-        "        }\n"
-        "        \n"
-        "        function closeTerminal() {\n"
-        "            document.getElementById('terminal').style.display = 'none';\n"
-        "            document.getElementById('overlay').style.display = 'none';\n"
-        "        }\n"
-        "        \n"
-        "        function minimizeTerminal() {\n"
-        "            closeTerminal();\n"
-        "        }\n"
-        "        \n"
-        "        function maximizeTerminal() {\n"
-        "            var terminal = document.getElementById('terminal');\n"
-        "            if (terminal.style.width === '95%%' && terminal.style.height === '95%%') {\n"
-        "                terminal.style.width = '80%%';\n"
-        "                terminal.style.height = '80%%';\n"
-        "            } else {\n"
-        "                terminal.style.width = '95%%';\n"
-        "                terminal.style.height = '95%%';\n"
-        "            }\n"
-        "        }\n"
-        "        \n"
-        "        // Show terminal if there's a command in the URL\n"
-        "        window.onload = function() {\n"
-        "            var urlParams = new URLSearchParams(window.location.search);\n"
-        "            if (urlParams.has('command')) {\n"
-        "                openTerminal();\n"
-        "            }\n"
-        "        };\n"
-        "        \n"
-        "        // Close terminal when clicking overlay\n"
-        "        document.getElementById('overlay').addEventListener('click', closeTerminal);\n"
-        "        \n"
-        "        // Prevent terminal from closing when clicking inside\n"
-        "        document.getElementById('terminal').addEventListener('click', function(e) {\n"
-        "            e.stopPropagation();\n"
-        "        });\n"
-        "    </script>\n"
-        "</body>\n"
-        "</html>\n");
+    // Update the stored values
+    metrics.last_rx_bytes = rx_bytes;
+    metrics.last_tx_bytes = tx_bytes;
+    metrics.last_bandwidth_check = now;
+    metrics.rx_bytes = rx_bytes;
+    metrics.tx_bytes = tx_bytes;
 }
 
+// Function to update all system metrics
+void update_metrics() {
+    // Update CPU usage
+    metrics.cpu_usage = get_cpu_usage();
+    
+    // Update memory usage
+    get_memory_usage(&metrics.total_memory, &metrics.used_memory, &metrics.memory_usage);
+    
+    // Update storage usage
+    get_storage_usage(&metrics.total_storage, &metrics.free_storage, &metrics.used_storage, &metrics.storage_usage);
+    
+    // Update bandwidth
+    update_bandwidth();
+    
+    // Update connection status
+    metrics.internet_connected = check_internet_connectivity();
+    metrics.ultima_server_connected = check_ultima_server_connectivity();
+}
+
+// Function to escape JSON strings
+char* json_escape_string(const char *str) {
+    if (!str) return strdup("");
+    
+    size_t escaped_len = 0;
+    const char *p;
+    
+    // Calculate the size needed for the escaped string
+    for (p = str; *p; p++) {
+        switch (*p) {
+            case '\"': case '\\': case '/': case '\b': case '\f': case '\n': case '\r': case '\t':
+                escaped_len += 2;
+                break;
+            default:
+                escaped_len++;
+                break;
+        }
+    }
+    
+    // Allocate memory for the escaped string
+    char *escaped = malloc(escaped_len + 1);
+    if (!escaped) return strdup("");
+    
+    // Copy and escape the string
+    char *q = escaped;
+    for (p = str; *p; p++) {
+        switch (*p) {
+            case '\"': *q++ = '\\'; *q++ = '\"'; break;
+            case '\\': *q++ = '\\'; *q++ = '\\'; break;
+            case '/': *q++ = '\\'; *q++ = '/'; break;
+            case '\b': *q++ = '\\'; *q++ = 'b'; break;
+            case '\f': *q++ = '\\'; *q++ = 'f'; break;
+            case '\n': *q++ = '\\'; *q++ = 'n'; break;
+            case '\r': *q++ = '\\'; *q++ = 'r'; break;
+            case '\t': *q++ = '\\'; *q++ = 't'; break;
+            default: *q++ = *p;
+        }
+    }
+    *q = '\0';
+    
+    return escaped;
+}
+
+// Function to generate JSON metrics
+char* generate_metrics_json() {
+    // Update metrics before generating JSON
+    update_metrics();
+    
+    // Format storage numbers for human readability
+    char storage_used_formatted[32];
+    char storage_total_formatted[32];
+    
+    if (metrics.used_storage < 1024) {
+        sprintf(storage_used_formatted, "%lu MB", metrics.used_storage);
+    } else {
+        sprintf(storage_used_formatted, "%.1f GB", metrics.used_storage / 1024.0);
+    }
+    
+    if (metrics.total_storage < 1024) {
+        sprintf(storage_total_formatted, "%lu MB", metrics.total_storage);
+    } else {
+        sprintf(storage_total_formatted, "%.1f GB", metrics.total_storage / 1024.0);
+    }
+    
+    // Build JSON response
+    char *json = malloc(4096);
+    if (!json) return NULL;
+    
+    sprintf(json, 
+        "{\n"
+        "  \"cpu\": {\n"
+        "    \"usage\": %.1f\n"
+        "  },\n"
+        "  \"memory\": {\n"
+        "    \"total\": %lu,\n"
+        "    \"used\": %lu,\n"
+        "    \"usage\": %.1f\n"
+        "  },\n"
+        "  \"storage\": {\n"
+        "    \"total\": %lu,\n"
+        "    \"used\": %lu,\n"
+        "    \"free\": %lu,\n"
+        "    \"usage\": %.1f,\n"
+        "    \"used_formatted\": \"%s\",\n"
+        "    \"total_formatted\": \"%s\"\n"
+        "  },\n"
+        "  \"bandwidth\": {\n"
+        "    \"download\": %.1f,\n"
+        "    \"upload\": %.1f\n"
+        "  },\n"
+        "  \"internet\": {\n"
+        "    \"connected\": %s\n"
+        "  },\n"
+        "  \"ultima_server\": {\n"
+        "    \"connected\": %s\n"
+        "  }\n"
+        "}",
+        metrics.cpu_usage,
+        metrics.total_memory, metrics.used_memory, metrics.memory_usage,
+        metrics.total_storage, metrics.used_storage, metrics.free_storage, metrics.storage_usage,
+        storage_used_formatted, storage_total_formatted,
+        metrics.download_rate, metrics.upload_rate,
+        metrics.internet_connected ? "true" : "false",
+        metrics.ultima_server_connected ? "true" : "false"
+    );
+    
+    return json;
+}
+
+// Function to get system information for OpenWRT
+char* get_system_info() {
+    static char info[4096];
+    int exit_status;
+    
+    // Try to get OpenWRT version
+    char *version_output = execute_command("cat /etc/openwrt_release 2>/dev/null || echo 'OpenWRT version information not available'", &exit_status);
+    char *kernel_output = execute_command("uname -a", &exit_status);
+    char *uptime_output = execute_command("uptime", &exit_status);
+    char *cpu_info = execute_command("cat /proc/cpuinfo | grep 'model name' | head -1 || cat /proc/cpuinfo | grep 'cpu model' | head -1", &exit_status);
+    
+    // Format the info
+    snprintf(info, sizeof(info),
+        "<div class=\"system-info\">"
+        "<h3>System Details</h3>"
+        "<pre>%s</pre>"
+        "<h3>Kernel Information</h3>"
+        "<pre>%s</pre>"
+        "<h3>Uptime</h3>"
+        "<pre>%s</pre>"
+        "<h3>CPU Information</h3>"
+        "<pre>%s</pre>"
+        "</div>",
+        version_output ? version_output : "Could not retrieve version information",
+        kernel_output ? kernel_output : "Could not retrieve kernel information",
+        uptime_output ? uptime_output : "Could not retrieve uptime information",
+        cpu_info ? cpu_info : "Could not retrieve CPU information"
+    );
+    
+    // Free memory
+    if (version_output) free(version_output);
+    if (kernel_output) free(kernel_output);
+    if (uptime_output) free(uptime_output);
+    if (cpu_info) free(cpu_info);
+    
+    return info;
+}
+
+// Function to get network information for OpenWRT
+char* get_network_info() {
+    static char info[8192];
+    int exit_status;
+    
+    // Get network interfaces
+    char *interfaces = execute_command("ifconfig", &exit_status);
+    char *wireless = execute_command("iwconfig 2>/dev/null || echo 'No wireless interfaces found'", &exit_status);
+    char *routing = execute_command("route -n", &exit_status);
+    char *dns = execute_command("cat /etc/resolv.conf", &exit_status);
+    
+    // Format the info
+    snprintf(info, sizeof(info),
+        "<div class=\"network-info\">"
+        "<h3>Network Interfaces</h3>"
+        "<pre>%s</pre>"
+        "<h3>Wireless Interfaces</h3>"
+        "<pre>%s</pre>"
+        "<h3>Routing Table</h3>"
+        "<pre>%s</pre>"
+        "<h3>DNS Configuration</h3>"
+        "<pre>%s</pre>"
+        "</div>",
+        interfaces ? interfaces : "Could not retrieve interface information",
+        wireless ? wireless : "Could not retrieve wireless information",
+        routing ? routing : "Could not retrieve routing information",
+        dns ? dns : "Could not retrieve DNS information"
+    );
+    
+    // Free memory
+    if (interfaces) free(interfaces);
+    if (wireless) free(wireless);
+    if (routing) free(routing);
+    if (dns) free(dns);
+    
+    return info;
+}
+
+// Function to get the OpenWRT version
+char* get_openwrt_version() {
+    static char version[128] = "Unknown";
+    int exit_status;
+    
+    char *output = execute_command("cat /etc/openwrt_release 2>/dev/null | grep DISTRIB_RELEASE | cut -d \"'\" -f 2", &exit_status);
+    if (output && strlen(output) > 0) {
+        // Remove trailing newline if present
+        char *newline = strchr(output, '\n');
+        if (newline) *newline = '\0';
+        
+        snprintf(version, sizeof(version), "%s", output);
+        free(output);
+    }
+    
+    return version;
+}
+
+// Function to get the kernel version
+char* get_kernel_version() {
+    static char version[128] = "Unknown";
+    int exit_status;
+    
+    char *output = execute_command("uname -r", &exit_status);
+    if (output && strlen(output) > 0) {
+        // Remove trailing newline if present
+        char *newline = strchr(output, '\n');
+        if (newline) *newline = '\0';
+        
+        snprintf(version, sizeof(version), "%s", output);
+        free(output);
+    }
+    
+    return version;
+}
+
+// Function to get the system uptime
+char* get_uptime() {
+    static char uptime_str[128] = "Unknown";
+    int exit_status;
+    
+    char *output = execute_command("uptime -p 2>/dev/null || uptime", &exit_status);
+    if (output && strlen(output) > 0) {
+        // Remove trailing newline if present
+        char *newline = strchr(output, '\n');
+        if (newline) *newline = '\0';
+        
+        snprintf(uptime_str, sizeof(uptime_str), "%s", output);
+        free(output);
+    }
+    
+    return uptime_str;
+}
+
+// Determine the content type based on the file extension
+const char* get_content_type(const char *path) {
+    const char *extension = strrchr(path, '.');
+    if (!extension) return "text/plain";
+    
+    for (int i = 0; content_types[i].extension; i++) {
+        if (strcmp(extension, content_types[i].extension) == 0) {
+            return content_types[i].mime_type;
+        }
+    }
+    
+    return "text/plain";
+}
+
+// Read a file into a buffer
+char* read_file(const char *path, size_t *size) {
+    FILE *file = fopen(path, "rb");
+    if (!file) return NULL;
+    
+    fseek(file, 0, SEEK_END);
+    *size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    char *buffer = malloc(*size + 1);
+    if (!buffer) {
+        fclose(file);
+        return NULL;
+    }
+    
+    size_t bytes_read = fread(buffer, 1, *size, file);
+    fclose(file);
+    
+    if (bytes_read != *size) {
+        free(buffer);
+        return NULL;
+    }
+    
+    buffer[*size] = '\0';
+    return buffer;
+}
+
+// Function to check if a file exists and is readable
+int file_exists(const char *path) {
+    return access(path, R_OK) == 0;
+}
+
+// Function to handle static file requests
+void handle_static_file(int socket, const char *path) {
+    char file_path[MAX_PATH_LENGTH];
+    
+    // Skip leading / in path if present
+    if (path[0] == '/') path++;
+    
+    // Build the file path
+    snprintf(file_path, MAX_PATH_LENGTH, "%s%s", path[0] ? "public/" : "public/index.html", path);
+    
+    // Special case for root path
+    if (strcmp(path, "") == 0 || strcmp(path, "/") == 0) {
+        strcpy(file_path, "templates/index.html");
+    }
+    
+    // Try to open the file
+    size_t file_size;
+    char *file_content = read_file(file_path, &file_size);
+    
+    if (!file_content) {
+        // File not found or error reading
+        char not_found[] = 
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: 121\r\n"
+            "\r\n"
+            "<html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
+        
+        send(socket, not_found, strlen(not_found), 0);
+        return;
+    }
+    
+    // Determine the content type
+    const char *content_type = get_content_type(file_path);
+    
+    // Prepare the response header
+    char header[256];
+    snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "\r\n", content_type, file_size);
+    
+    // Send the header
+    send(socket, header, strlen(header), 0);
+    
+    // Send the file content
+    send(socket, file_content, file_size, 0);
+    
+    // Clean up
+    free(file_content);
+}
+
+// Function to render HTML template with data
+void render_template(char *buffer, const char *client_ip, const char *command, const char *cmd_output, int exit_status) {
+    // Read the template file
+    size_t template_size;
+    char *template = read_file("templates/index.html", &template_size);
+    
+    if (!template) {
+        // Template not found, use a basic HTML response
+        sprintf(buffer,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "\r\n"
+            "<html><head><title>Error</title></head><body>"
+            "<h1>Template Error</h1>"
+            "<p>Could not load the template file.</p>"
+            "</body></html>"
+        );
+        return;
+    }
+    
+    // Get current time for server time display
+    time_t now;
+    time(&now);
+    char *time_str = ctime(&now);
+    // Remove trailing newline from time string
+    if (time_str[strlen(time_str) - 1] == '\n') {
+        time_str[strlen(time_str) - 1] = '\0';
+    }
+    
+    // Get system information
+    char *system_info = get_system_info();
+    char *network_info = get_network_info();
+    char *openwrt_version = get_openwrt_version();
+    char *kernel_version = get_kernel_version();
+    char *uptime = get_uptime();
+    
+    // Create a new string buffer for the processed template
+    char *processed = malloc(TEMPLATE_MAX_SIZE);
+    if (!processed) {
+        free(template);
+        sprintf(buffer, 
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Content-Type: text/plain\r\n"
+            "\r\n"
+            "Memory allocation error"
+        );
+        return;
+    }
+    
+    // Simple template replacement (not a full template engine)
+    char *pos = template;
+    char *write_pos = processed;
+    int remaining = TEMPLATE_MAX_SIZE - 1;  // -1 for null terminator
+    
+    while (*pos && remaining > 0) {
+        // Look for placeholder tags
+        if (*pos == '{' && *(pos+1) == '{') {
+            pos += 2;  // Skip the {{ characters
+            
+            // Extract the placeholder name
+            char placeholder[128] = {0};
+            char *p = placeholder;
+            while (*pos && *pos != '}' && (p - placeholder) < sizeof(placeholder) - 1) {
+                *p++ = *pos++;
+            }
+            *p = '\0';
+            
+            // Skip the closing }}
+            if (*pos == '}' && *(pos+1) == '}') {
+                pos += 2;
+            }
+            
+            // Trim whitespace
+            char *trim = placeholder;
+            while (*trim == ' ') trim++;
+            
+            // Replace the placeholder with the actual value
+            int written = 0;
+            
+            if (strcmp(trim, "client_ip") == 0) {
+                written = snprintf(write_pos, remaining, "%s", client_ip);
+            }
+            else if (strcmp(trim, "server_time") == 0) {
+                written = snprintf(write_pos, remaining, "%s", time_str);
+            }
+            else if (strcmp(trim, "system_info") == 0) {
+                written = snprintf(write_pos, remaining, "%s", system_info);
+            }
+            else if (strcmp(trim, "network_info") == 0) {
+                written = snprintf(write_pos, remaining, "%s", network_info);
+            }
+            else if (strcmp(trim, "openwrt_version") == 0) {
+                written = snprintf(write_pos, remaining, "%s", openwrt_version);
+            }
+            else if (strcmp(trim, "kernel_version") == 0) {
+                written = snprintf(write_pos, remaining, "%s", kernel_version);
+            }
+            else if (strcmp(trim, "uptime") == 0) {
+                written = snprintf(write_pos, remaining, "%s", uptime);
+            }
+            else if (strcmp(trim, "#terminal_history") == 0) {
+                // Terminal history is more complex to handle
+                // For simplicity, we'll just skip this part in this simple implementation
+                // A proper template engine would handle this
+                written = 0;
+            }
+            else {
+                // Unknown placeholder, just write it back
+                written = snprintf(write_pos, remaining, "{{%s}}", placeholder);
+            }
+            
+            if (written > 0) {
+                write_pos += written;
+                remaining -= written;
+            }
+        }
+        else {
+            // Regular character, just copy it
+            *write_pos++ = *pos++;
+            remaining--;
+        }
+    }
+    
+    // Null terminate the processed string
+    *write_pos = '\0';
+    
+    // Add the terminal history if room
+    if (history_count > 0 && strstr(processed, "terminal-body") != NULL) {
+        char *terminal_body_end = strstr(processed, "</div>\n        <form");
+        if (terminal_body_end) {
+            char history_html[4096] = {0};
+            char *p = history_html;
+            int remaining_history = sizeof(history_html) - 1;
+            
+            for (int i = 0; i < history_count && remaining_history > 0; i++) {
+                int written = snprintf(p, remaining_history, 
+                    "            <div class=\"terminal-prompt\">$ %s</div>\n", 
+                    command_history[i]);
+                
+                if (written > 0) {
+                    p += written;
+                    remaining_history -= written;
+                }
+                
+                // Add the current command output if this is the most recent command
+                if (i == history_count - 1 && command && strcmp(command, command_history[i]) == 0 && cmd_output) {
+                    written = snprintf(p, remaining_history,
+                        "            <div class=\"command-output %s\">%s</div>\n",
+                        exit_status == 0 ? "command-success" : "command-error",
+                        cmd_output);
+                    
+                    if (written > 0) {
+                        p += written;
+                        remaining_history -= written;
+                    }
+                }
+            }
+            
+            // Add the command output if command is not in history but was just executed
+            if (command && command[0] && cmd_output && 
+                (history_count == 0 || strcmp(command, command_history[history_count-1]) != 0)) {
+                int written = snprintf(p, remaining_history,
+                    "            <div class=\"terminal-prompt\">$ %s</div>\n"
+                    "            <div class=\"command-output %s\">%s</div>\n",
+                    command, 
+                    exit_status == 0 ? "command-success" : "command-error",
+                    cmd_output);
+                
+                if (written > 0) {
+                    p += written;
+                    remaining_history -= written;
+                }
+            }
+            
+            // Now insert the history_html before terminal_body_end
+            size_t history_len = strlen(history_html);
+            size_t insert_pos = terminal_body_end - processed;
+            
+            if (insert_pos + history_len < TEMPLATE_MAX_SIZE) {
+                // Make room by moving the tail
+                memmove(processed + insert_pos + history_len, processed + insert_pos, 
+                        strlen(processed + insert_pos) + 1);  // +1 for null terminator
+                
+                // Insert the history
+                memcpy(processed + insert_pos, history_html, history_len);
+            }
+        }
+    }
+    
+    // Prepare the HTTP response
+    sprintf(buffer,
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %zu\r\n"
+        "\r\n"
+        "%s",
+        strlen(processed), processed);
+    
+    // Clean up
+    free(template);
+    free(processed);
+}
+
+// Function to handle API requests
+void handle_api_request(int socket, const char *path) {
+    if (strcmp(path, "/api/metrics") == 0) {
+        // Generate metrics JSON
+        char *metrics_json = generate_metrics_json();
+        if (!metrics_json) {
+            char error_response[] = 
+                "HTTP/1.1 500 Internal Server Error\r\n"
+                "Content-Type: application/json\r\n"
+                "Content-Length: 35\r\n"
+                "\r\n"
+                "{\"error\":\"Failed to generate metrics\"}";
+            
+            send(socket, error_response, strlen(error_response), 0);
+            return;
+        }
+        
+        // Prepare the response header
+        char *response = malloc(strlen(metrics_json) + 256);
+        if (!response) {
+            free(metrics_json);
+            char error_response[] = 
+                "HTTP/1.1 500 Internal Server Error\r\n"
+                "Content-Type: application/json\r\n"
+                "Content-Length: 35\r\n"
+                "\r\n"
+                "{\"error\":\"Memory allocation error\"}";
+            
+            send(socket, error_response, strlen(error_response), 0);
+            return;
+        }
+        
+        sprintf(response,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: %zu\r\n"
+            "\r\n"
+            "%s", strlen(metrics_json), metrics_json);
+        
+        // Send the response
+        send(socket, response, strlen(response), 0);
+        
+        // Clean up
+        free(metrics_json);
+        free(response);
+    }
+    else {
+        // Unknown API endpoint
+        char error_response[] = 
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: 44\r\n"
+            "\r\n"
+            "{\"error\":\"The requested API was not found\"}";
+        
+        send(socket, error_response, strlen(error_response), 0);
+    }
+}
+
+// Main function
 int main(int argc, char *argv[]) {
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -425,6 +987,10 @@ int main(int argc, char *argv[]) {
             port = atoi(argv[2]);
         }
     }
+    
+    // Initialize metrics
+    memset(&metrics, 0, sizeof(metrics));
+    metrics.last_bandwidth_check = time(NULL);
     
     // Create socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -449,7 +1015,7 @@ int main(int argc, char *argv[]) {
     }
     
     // Start listening
-    if (listen(server_fd, 3) < 0) {
+    if (listen(server_fd, 10) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
@@ -477,19 +1043,29 @@ int main(int argc, char *argv[]) {
         }
         buffer[bytes_read] = '\0';
         
+        // Parse request line
+        char method[16] = {0};
+        char path[MAX_PATH_LENGTH] = {0};
+        char protocol[16] = {0};
+        
+        sscanf(buffer, "%s %s %s", method, path, protocol);
+        
         // Parse command if this is a GET request with command parameter
         char command[MAX_COMMAND_SIZE] = {0};
         char *cmd_output = NULL;
         int exit_status = 0;
         
-        if (strncmp(buffer, "GET /?", 6) == 0) {
-            char *query_start = buffer + 6;
-            char *query_end = strchr(query_start, ' ');
-            if (query_end) {
-                *query_end = '\0';
-                parse_query_params(query_start, command, sizeof(command));
-                *query_end = ' ';
-            }
+        // Check if this is a query string
+        char *query_string = strchr(path, '?');
+        if (query_string) {
+            *query_string = '\0';  // Terminate the path at the ?
+            query_string++;  // Move to the character after ?
+            
+            // Parse the query parameters
+            parse_query_params(query_string, command, sizeof(command));
+            
+            // Restore the path with query string for potential static file serving
+            *(query_string - 1) = '?';
         }
         
         // If a command was submitted, execute it
@@ -537,17 +1113,40 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // Generate dynamic HTML with terminal popup
-        generate_dynamic_html(buffer, client_ip, command[0] ? command : NULL, cmd_output, exit_status);
+        // Handle based on the path
+        if (strncmp(path, "/api/", 5) == 0) {
+            // API request
+            handle_api_request(new_socket, path);
+        }
+        else if (strncmp(path, "/css/", 5) == 0 || 
+                 strncmp(path, "/js/", 4) == 0 || 
+                 strncmp(path, "/img/", 5) == 0) {
+            // Static file request (CSS, JS, images)
+            handle_static_file(new_socket, path);
+        }
+        else {
+            // Render the main template or handle other paths
+            if (strcmp(path, "/") == 0 || strcmp(path, "/index.html") == 0) {
+                // Render the main template
+                render_template(buffer, client_ip, command[0] ? command : NULL, cmd_output, exit_status);
+                send(new_socket, buffer, strlen(buffer), 0);
+            }
+            else if (file_exists(path + 1)) {  // +1 to skip leading /
+                // Serve static file
+                handle_static_file(new_socket, path);
+            }
+            else {
+                // Try to redirect to index.html
+                render_template(buffer, client_ip, command[0] ? command : NULL, cmd_output, exit_status);
+                send(new_socket, buffer, strlen(buffer), 0);
+            }
+        }
         
         // Free command output memory
         if (cmd_output) {
             free(cmd_output);
             cmd_output = NULL;
         }
-        
-        // Send the HTML response
-        send(new_socket, buffer, strlen(buffer), 0);
         
         // Close the connection
         close(new_socket);
