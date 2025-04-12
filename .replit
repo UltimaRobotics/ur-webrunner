@@ -1,0 +1,60 @@
+modules = ["c"]
+
+[nix]
+channel = "stable-24_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "OpenWRT Management Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "run_openwrt_management"
+
+[[workflows.workflow]]
+name = "OpenWRT Management Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management 0.0.0.0 5000"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "run_openwrt_management"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management"
+
+[deployment]
+run = ["sh", "-c", "gcc -Wall -Wextra -O2 -o openwrt_management main.c && ./openwrt_management 0.0.0.0 5000"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
