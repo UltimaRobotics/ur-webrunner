@@ -7,11 +7,15 @@
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gauge-chart@0.5.3/dist/bundle.min.js"></script>
 </head>
 <body>
     <div class="header">
         <h1><i class="fas fa-wifi"></i> OpenWRT Management Interface</h1>
-        <button id="terminal-btn" class="terminal-btn"><i class="fas fa-terminal"></i> Terminal</button>
+        <div class="header-actions">
+            <button id="mqtt-toggle-btn" class="action-btn"><i class="fas fa-sync-alt"></i> MQTT Status</button>
+            <button id="api-docs-btn" class="action-btn"><i class="fas fa-code"></i> API Docs</button>
+        </div>
     </div>
     
     <div class="main-container">
@@ -20,10 +24,11 @@
                 <li data-tab="dashboard" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
                 <li data-tab="system"><i class="fas fa-server"></i> System</li>
                 <li data-tab="network"><i class="fas fa-network-wired"></i> Network</li>
+                <li data-tab="bandwidth"><i class="fas fa-exchange-alt"></i> Bandwidth</li>
                 <li data-tab="services"><i class="fas fa-cogs"></i> Services</li>
                 <li data-tab="firewall"><i class="fas fa-shield-alt"></i> Firewall</li>
+                <li data-tab="firmware"><i class="fas fa-microchip"></i> Firmware</li>
                 <li data-tab="logs"><i class="fas fa-list"></i> Logs</li>
-                <li id="terminal-menu-item"><i class="fas fa-terminal"></i> Terminal</li>
             </ul>
         </div>
         
@@ -32,11 +37,39 @@
             <div id="dashboard" class="tab-content active">
                 <div class="card">
                     <h2><i class="fas fa-info-circle"></i> Device Information</h2>
-                    <p><strong>Client IP:</strong> <span id="clientIP">{{client_ip}}</span></p>
-                    <p><strong>Server Time:</strong> <span id="serverTime">{{server_time}}</span></p>
-                    <p><strong>OpenWRT Version:</strong> <span id="openwrtVersion">{{openwrt_version}}</span></p>
-                    <p><strong>Kernel Version:</strong> <span id="kernelVersion">{{kernel_version}}</span></p>
-                    <p><strong>Uptime:</strong> <span id="uptimeValue">{{uptime}}</span></p>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <p><strong>Client IP:</strong> <span id="clientIP">{{client_ip}}</span></p>
+                            <p><strong>Server Time:</strong> <span id="serverTime">{{server_time}}</span></p>
+                            <p><strong>OpenWRT Version:</strong> <span id="openwrtVersion">{{openwrt_version}}</span></p>
+                            <p><strong>Kernel Version:</strong> <span id="kernelVersion">{{kernel_version}}</span></p>
+                            <p><strong>Uptime:</strong> <span id="uptimeValue">{{uptime}}</span></p>
+                        </div>
+                        <div class="info-item">
+                            <h3>Connection Status</h3>
+                            <div class="connection-status-container">
+                                <div class="connection-status-card">
+                                    <div class="connection-icon" id="internetStatusIcon">
+                                        <i class="fas fa-globe"></i>
+                                    </div>
+                                    <div class="connection-details">
+                                        <div class="connection-name">Internet</div>
+                                        <div class="connection-state" id="internetStatusText">Disconnected</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="connection-status-card">
+                                    <div class="connection-icon" id="ultimaStatusIcon">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div class="connection-details">
+                                        <div class="connection-name">Ultima Robotics Server</div>
+                                        <div class="connection-state" id="ultimaStatusText">Disconnected</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Real-time Metrics Section -->
@@ -98,24 +131,8 @@
                             <div style="height: 150px; width: 100%; margin-top: 15px;">
                                 <canvas id="bandwidthChart"></canvas>
                             </div>
+                            <button class="test-button" onclick="openBandwidthTest()">Run Bandwidth Test</button>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Connection Status -->
-                <div class="card">
-                    <h2><i class="fas fa-plug"></i> Connection Status</h2>
-                    
-                    <div class="connection-status">
-                        <span class="status-indicator status-offline" id="internetStatus"></span>
-                        <strong>Internet Connection:</strong> 
-                        <span id="internetStatusText" style="margin-left: 10px; color: #f44336;">Disconnected</span>
-                    </div>
-                    
-                    <div class="connection-status">
-                        <span class="status-indicator status-offline" id="ultimaStatus"></span>
-                        <strong>Ultima Robotics Server:</strong> 
-                        <span id="ultimaStatusText" style="margin-left: 10px; color: #f44336;">Disconnected</span>
                     </div>
                 </div>
             </div>
@@ -140,11 +157,94 @@
                 </div>
             </div>
             
+            <!-- Bandwidth Tab -->
+            <div id="bandwidth" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-exchange-alt"></i> Bandwidth Monitor</h2>
+                    <div class="bandwidth-test-container">
+                        <div class="bandwidth-speedometer">
+                            <div id="speedGauge" class="gauge-container"></div>
+                            <div class="speedometer-value">
+                                <span id="speedValue">0</span>
+                                <span class="unit">Mbps</span>
+                            </div>
+                        </div>
+                        <div class="bandwidth-stats">
+                            <div class="stat-row">
+                                <div class="stat-label"><i class="fas fa-arrow-down"></i> Download</div>
+                                <div class="stat-value"><span id="downloadSpeedValue">--</span> Mbps</div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="stat-label"><i class="fas fa-arrow-up"></i> Upload</div>
+                                <div class="stat-value"><span id="uploadSpeedValue">--</span> Mbps</div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="stat-label"><i class="fas fa-stopwatch"></i> Ping</div>
+                                <div class="stat-value"><span id="pingValue">--</span> ms</div>
+                            </div>
+                            <button id="startBandwidthTest" class="test-button">Run Bandwidth Test</button>
+                        </div>
+                    </div>
+                    <div class="bandwidth-history">
+                        <h3>Bandwidth History</h3>
+                        <div class="chart-container">
+                            <canvas id="bandwidthHistoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Services Tab -->
             <div id="services" class="tab-content">
                 <div class="card">
                     <h2><i class="fas fa-cogs"></i> Services Management</h2>
-                    <p>Services management would be shown here.</p>
+                    <div class="service-list">
+                        <div class="service-header">
+                            <div class="service-name">Service Name</div>
+                            <div class="service-status">Status</div>
+                            <div class="service-actions">Actions</div>
+                        </div>
+                        <div class="service-item">
+                            <div class="service-name">DHCP</div>
+                            <div class="service-status running">Running</div>
+                            <div class="service-actions">
+                                <button class="action-btn stop-btn">Stop</button>
+                                <button class="action-btn restart-btn">Restart</button>
+                            </div>
+                        </div>
+                        <div class="service-item">
+                            <div class="service-name">DNS</div>
+                            <div class="service-status running">Running</div>
+                            <div class="service-actions">
+                                <button class="action-btn stop-btn">Stop</button>
+                                <button class="action-btn restart-btn">Restart</button>
+                            </div>
+                        </div>
+                        <div class="service-item">
+                            <div class="service-name">Firewall</div>
+                            <div class="service-status running">Running</div>
+                            <div class="service-actions">
+                                <button class="action-btn stop-btn">Stop</button>
+                                <button class="action-btn restart-btn">Restart</button>
+                            </div>
+                        </div>
+                        <div class="service-item">
+                            <div class="service-name">SSH</div>
+                            <div class="service-status running">Running</div>
+                            <div class="service-actions">
+                                <button class="action-btn stop-btn">Stop</button>
+                                <button class="action-btn restart-btn">Restart</button>
+                            </div>
+                        </div>
+                        <div class="service-item">
+                            <div class="service-name">MQTT</div>
+                            <div class="service-status stopped">Stopped</div>
+                            <div class="service-actions">
+                                <button class="action-btn start-btn">Start</button>
+                                <button class="action-btn restart-btn disabled">Restart</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -152,7 +252,115 @@
             <div id="firewall" class="tab-content">
                 <div class="card">
                     <h2><i class="fas fa-shield-alt"></i> Firewall Settings</h2>
-                    <p>Firewall settings would be shown here.</p>
+                    <div class="firewall-zones">
+                        <h3>Firewall Zones</h3>
+                        <div class="zone-list">
+                            <div class="zone-item">
+                                <div class="zone-name">WAN</div>
+                                <div class="zone-details">Internet Connection</div>
+                                <div class="zone-actions">
+                                    <button class="action-btn">Edit</button>
+                                </div>
+                            </div>
+                            <div class="zone-item">
+                                <div class="zone-name">LAN</div>
+                                <div class="zone-details">Local Network</div>
+                                <div class="zone-actions">
+                                    <button class="action-btn">Edit</button>
+                                </div>
+                            </div>
+                            <div class="zone-item">
+                                <div class="zone-name">Guest</div>
+                                <div class="zone-details">Guest Network</div>
+                                <div class="zone-actions">
+                                    <button class="action-btn">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="firewall-rules">
+                        <h3>Port Forwarding Rules</h3>
+                        <div class="rule-list">
+                            <div class="rule-item">
+                                <div class="rule-name">SSH Access</div>
+                                <div class="rule-details">TCP:22 → 192.168.1.100:22</div>
+                                <div class="rule-actions">
+                                    <button class="action-btn">Edit</button>
+                                    <button class="action-btn delete-btn">Delete</button>
+                                </div>
+                            </div>
+                            <div class="rule-item">
+                                <div class="rule-name">Web Server</div>
+                                <div class="rule-details">TCP:80 → 192.168.1.200:80</div>
+                                <div class="rule-actions">
+                                    <button class="action-btn">Edit</button>
+                                    <button class="action-btn delete-btn">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="add-rule-btn">Add New Rule</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Firmware Tab -->
+            <div id="firmware" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-microchip"></i> Firmware Management</h2>
+                    <div class="firmware-info">
+                        <div class="firmware-current">
+                            <h3>Current Firmware</h3>
+                            <div class="firmware-details">
+                                <p><strong>Version:</strong> <span id="firmwareVersion">{{openwrt_version}}</span></p>
+                                <p><strong>Build Date:</strong> <span id="firmwareBuildDate">2025-03-15</span></p>
+                                <p><strong>Architecture:</strong> <span id="firmwareArch">arm_cortex-a53_neon-vfpv4</span></p>
+                                <p><strong>Status:</strong> <span class="status-stable">Stable</span></p>
+                            </div>
+                        </div>
+                        
+                        <div class="firmware-available">
+                            <h3>Available Updates</h3>
+                            <div class="update-status" id="updateStatus">
+                                <i class="fas fa-check-circle"></i> Your firmware is up to date
+                            </div>
+                            <div class="last-check">
+                                Last checked: <span id="lastUpdateCheck">April 12, 2025 14:30</span>
+                                <button class="refresh-btn"><i class="fas fa-sync-alt"></i></button>
+                            </div>
+                            <button class="check-updates-btn">Check for Updates</button>
+                        </div>
+                    </div>
+                    
+                    <div class="firmware-options">
+                        <div class="option-card">
+                            <div class="option-icon"><i class="fas fa-cloud-download-alt"></i></div>
+                            <div class="option-title">Online Update</div>
+                            <div class="option-description">Update firmware directly from the OpenWRT repositories</div>
+                            <button class="option-btn">Start Online Update</button>
+                        </div>
+                        
+                        <div class="option-card">
+                            <div class="option-icon"><i class="fas fa-file-upload"></i></div>
+                            <div class="option-title">Local Update</div>
+                            <div class="option-description">Upload a firmware image from your local device</div>
+                            <label for="firmware-file" class="option-btn">Upload Firmware</label>
+                            <input type="file" id="firmware-file" style="display: none">
+                        </div>
+                        
+                        <div class="option-card">
+                            <div class="option-icon"><i class="fas fa-save"></i></div>
+                            <div class="option-title">Backup Settings</div>
+                            <div class="option-description">Create a backup of your current configuration</div>
+                            <button class="option-btn">Create Backup</button>
+                        </div>
+                        
+                        <div class="option-card">
+                            <div class="option-icon"><i class="fas fa-undo"></i></div>
+                            <div class="option-title">Factory Reset</div>
+                            <div class="option-description">Reset device to factory default settings</div>
+                            <button class="option-btn danger-btn">Factory Reset</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -160,38 +368,259 @@
             <div id="logs" class="tab-content">
                 <div class="card">
                     <h2><i class="fas fa-list"></i> System Logs</h2>
-                    <pre id="logContent">Loading logs...</pre>
+                    <div class="log-filters">
+                        <div class="filter-group">
+                            <label for="logLevel">Log Level:</label>
+                            <select id="logLevel">
+                                <option value="all">All</option>
+                                <option value="error">Errors</option>
+                                <option value="warning">Warnings</option>
+                                <option value="info">Info</option>
+                                <option value="debug">Debug</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="logSource">Source:</label>
+                            <select id="logSource">
+                                <option value="all">All</option>
+                                <option value="system">System</option>
+                                <option value="network">Network</option>
+                                <option value="firewall">Firewall</option>
+                                <option value="services">Services</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <button class="refresh-logs-btn"><i class="fas fa-sync-alt"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <pre id="logContent" class="logs-container">Loading logs...</pre>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Terminal Popup -->
-    <div class="overlay" id="overlay"></div>
-    <div class="terminal-popup" id="terminal">
-        <div class="terminal-header">
-            <h3 class="terminal-title"><i class="fas fa-terminal"></i> OpenWRT Terminal</h3>
-            <div class="terminal-controls">
-                <div class="terminal-control terminal-minimize" id="terminal-minimize"></div>
-                <div class="terminal-control terminal-maximize" id="terminal-maximize"></div>
-                <div class="terminal-control terminal-close" id="terminal-close"></div>
+    <!-- Bandwidth Test Popup -->
+    <div class="overlay" id="bandwidthTestOverlay"></div>
+    <div class="popup" id="bandwidthTestPopup">
+        <div class="popup-header">
+            <h3 class="popup-title"><i class="fas fa-tachometer-alt"></i> Bandwidth Test</h3>
+            <div class="popup-close" id="bandwidthTestClose">&times;</div>
+        </div>
+        <div class="popup-body">
+            <div class="bandwidth-test-content">
+                <div class="speedometer">
+                    <div class="gauge-container" id="popupSpeedGauge"></div>
+                    <div class="speed-value" id="popupSpeedValue">0 Mbps</div>
+                </div>
+                
+                <div class="test-metrics">
+                    <div class="metric">
+                        <div class="metric-icon download-icon">
+                            <i class="fas fa-arrow-down"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-label">Download</div>
+                            <div class="metric-value" id="popupDownloadValue">-- Mbps</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric">
+                        <div class="metric-icon upload-icon">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-label">Upload</div>
+                            <div class="metric-value" id="popupUploadValue">-- Mbps</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric">
+                        <div class="metric-icon ping-icon">
+                            <i class="fas fa-stopwatch"></i>
+                        </div>
+                        <div class="metric-info">
+                            <div class="metric-label">Ping</div>
+                            <div class="metric-value" id="popupPingValue">-- ms</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="test-server">
+                    <span class="server-label">Test Server:</span>
+                    <span class="server-value" id="testServerLocation">Malmö, Sweden</span>
+                </div>
+                
+                <div class="test-progress" id="testProgress">
+                    <div class="progress-bar" id="testProgressBar"></div>
+                </div>
+                
+                <button id="startPopupBandwidthTest" class="test-button">Start Test</button>
             </div>
         </div>
-        <div class="terminal-body" id="terminal-body">
-            <div class="terminal-prompt">Welcome to OpenWRT Terminal</div>
-            <div class="terminal-prompt">Type 'help' for a list of common commands</div>
-            
-            {{#terminal_history}}
-            <div class="terminal-prompt">$ {{command}}</div>
-            <div class="command-output {{status_class}}">{{output}}</div>
-            {{/terminal_history}}
+    </div>
+    
+    <!-- API Docs Popup -->
+    <div class="overlay" id="apiDocsOverlay"></div>
+    <div class="popup wide-popup" id="apiDocsPopup">
+        <div class="popup-header">
+            <h3 class="popup-title"><i class="fas fa-code"></i> API Documentation</h3>
+            <div class="popup-close" id="apiDocsClose">&times;</div>
         </div>
-        <form method="GET" action="/" class="terminal-form" id="terminal-form">
-            <input type="text" name="command" id="commandInput" placeholder="Enter command..." autocomplete="off">
-            <button type="submit"><i class="fas fa-play"></i> Execute</button>
-        </form>
+        <div class="popup-body">
+            <div class="api-docs-content">
+                <div class="api-section">
+                    <h3>REST API Endpoints</h3>
+                    <div class="api-endpoint">
+                        <div class="http-method get">GET</div>
+                        <div class="endpoint-path">/api/metrics</div>
+                        <div class="endpoint-description">Get real-time system metrics</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <div class="http-method get">GET</div>
+                        <div class="endpoint-path">/api/system</div>
+                        <div class="endpoint-description">Get system information</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <div class="http-method get">GET</div>
+                        <div class="endpoint-path">/api/network</div>
+                        <div class="endpoint-description">Get network configuration</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <div class="http-method get">GET</div>
+                        <div class="endpoint-path">/api/firmware</div>
+                        <div class="endpoint-description">Get firmware information</div>
+                    </div>
+                    <div class="api-endpoint">
+                        <div class="http-method post">POST</div>
+                        <div class="endpoint-path">/api/services/:service/:action</div>
+                        <div class="endpoint-description">Control system services (start/stop/restart)</div>
+                    </div>
+                </div>
+                
+                <div class="api-section">
+                    <h3>MQTT Integration</h3>
+                    <div class="mqtt-info">
+                        <p>Connect to the MQTT broker running on this OpenWRT device to receive real-time updates:</p>
+                        <pre>Host: {{client_ip}}
+Port: 1883
+Username: openwrt
+Password: [Set in MQTT configuration]</pre>
+                    </div>
+                    
+                    <h4>Available Topics</h4>
+                    <div class="mqtt-topics">
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/metrics</div>
+                            <div class="topic-description">Real-time system metrics updated every 5 seconds</div>
+                        </div>
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/network/status</div>
+                            <div class="topic-description">Network status changes (online/offline)</div>
+                        </div>
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/services/+/status</div>
+                            <div class="topic-description">Service status changes</div>
+                        </div>
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/firmware/updates</div>
+                            <div class="topic-description">Firmware update notifications</div>
+                        </div>
+                    </div>
+                    
+                    <h4>Control Topics (Publish To)</h4>
+                    <div class="mqtt-topics">
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/services/+/control</div>
+                            <div class="topic-description">Control services (payload: "start", "stop", "restart")</div>
+                        </div>
+                        <div class="topic-item">
+                            <div class="topic-path">openwrt/system/reboot</div>
+                            <div class="topic-description">Reboot the system (payload: "1")</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="api-section">
+                    <h3>Example JSON Payloads</h3>
+                    <div class="json-example">
+                        <h4>GET /api/metrics</h4>
+                        <pre>{
+  "cpu": {
+    "usage": 12.5
+  },
+  "memory": {
+    "total": 512,
+    "used": 128,
+    "usage": 25.0
+  },
+  "storage": {
+    "total": 1024,
+    "used": 512,
+    "free": 512,
+    "usage": 50.0,
+    "used_formatted": "512 MB",
+    "total_formatted": "1.0 GB"
+  },
+  "bandwidth": {
+    "download": 1.2,
+    "upload": 0.4
+  },
+  "internet": {
+    "connected": true
+  },
+  "ultima_server": {
+    "connected": true
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MQTT Status Popup -->
+    <div class="overlay" id="mqttStatusOverlay"></div>
+    <div class="popup" id="mqttStatusPopup">
+        <div class="popup-header">
+            <h3 class="popup-title"><i class="fas fa-sync-alt"></i> MQTT Status</h3>
+            <div class="popup-close" id="mqttStatusClose">&times;</div>
+        </div>
+        <div class="popup-body">
+            <div class="mqtt-status-content">
+                <div class="status-indicator-large" id="mqttConnectionStatus">
+                    <i class="fas fa-times-circle"></i>
+                    <span>Disconnected</span>
+                </div>
+                
+                <div class="mqtt-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Broker Address</div>
+                        <div class="stat-value" id="mqttBrokerAddress">{{client_ip}}:1883</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Connected Clients</div>
+                        <div class="stat-value" id="mqttClientCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Messages Published</div>
+                        <div class="stat-value" id="mqttPublishedCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Messages Received</div>
+                        <div class="stat-value" id="mqttReceivedCount">0</div>
+                    </div>
+                </div>
+                
+                <div class="mqtt-controls">
+                    <button id="startMqttButton" class="action-btn start-btn">Start MQTT Broker</button>
+                    <button id="stopMqttButton" class="action-btn stop-btn" disabled>Stop MQTT Broker</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script src="/js/main.js"></script>
+    <script src="/js/bandwidth-test.js"></script>
+    <script src="/js/mqtt-integration.js"></script>
 </body>
 </html>

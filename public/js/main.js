@@ -8,12 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     showTab('dashboard');
     
     // Initialize charts if we're on the dashboard
-    if (document.getElementById('dashboard').classList.contains('active')) {
+    if (document.getElementById('dashboard')?.classList.contains('active')) {
         initializeCharts();
     }
-    
-    // Check for terminal command in URL
-    checkCommandInURL();
     
     // Set up event listeners
     setupEventListeners();
@@ -25,33 +22,20 @@ function setupEventListeners() {
     document.querySelectorAll('.sidebar-menu li').forEach(item => {
         item.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
-            showTab(tabId);
-            
-            // Initialize charts if switching to dashboard
-            if (tabId === 'dashboard' && !cpuChart) {
-                initializeCharts();
+            if (tabId) {
+                showTab(tabId);
+                
+                // Initialize charts if switching to dashboard
+                if (tabId === 'dashboard' && !cpuChart) {
+                    initializeCharts();
+                }
             }
         });
     });
     
-    // Terminal controls
-    document.getElementById('terminal-btn').addEventListener('click', openTerminal);
-    document.getElementById('overlay').addEventListener('click', closeTerminal);
-    document.getElementById('terminal-close').addEventListener('click', closeTerminal);
-    document.getElementById('terminal-minimize').addEventListener('click', minimizeTerminal);
-    document.getElementById('terminal-maximize').addEventListener('click', maximizeTerminal);
-    
-    // Prevent terminal from closing when clicking inside
-    document.getElementById('terminal').addEventListener('click', function(e) {
-        e.stopPropagation();
-    });
-    
-    // Terminal form submission
-    document.getElementById('terminal-form').addEventListener('submit', function(e) {
-        const commandInput = document.getElementById('commandInput');
-        if (!commandInput.value.trim()) {
-            e.preventDefault();
-        }
+    // Set up event listeners for terminal menu item (removed from UI)
+    document.getElementById('terminal-menu-item')?.addEventListener('click', function() {
+        this.style.display = 'none';
     });
 }
 
@@ -63,7 +47,10 @@ function showTab(tabId) {
     });
     
     // Show selected tab content
-    document.getElementById(tabId).classList.add('active');
+    const selectedTab = document.getElementById(tabId);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
     
     // Update active menu item
     document.querySelectorAll('.sidebar-menu li').forEach(item => {
@@ -84,90 +71,98 @@ function showTab(tabId) {
 // Initialize charts for real-time metrics
 function initializeCharts() {
     // CPU Usage Chart
-    const cpuCtx = document.getElementById('cpuChart').getContext('2d');
-    cpuChart = new Chart(cpuCtx, {
-        type: 'line',
-        data: {
-            labels: Array(30).fill(''),
-            datasets: [{
-                label: 'CPU Usage %',
-                data: Array(30).fill(0),
-                borderColor: '#0066cc',
-                backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: getChartOptions('CPU Usage %')
-    });
+    const cpuCtx = document.getElementById('cpuChart')?.getContext('2d');
+    if (cpuCtx) {
+        cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: {
+                labels: Array(30).fill(''),
+                datasets: [{
+                    label: 'CPU Usage %',
+                    data: Array(30).fill(0),
+                    borderColor: '#0066cc',
+                    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: getChartOptions('CPU Usage %')
+        });
+    }
     
     // Memory Usage Chart
-    const memCtx = document.getElementById('memoryChart').getContext('2d');
-    memoryChart = new Chart(memCtx, {
-        type: 'line',
-        data: {
-            labels: Array(30).fill(''),
-            datasets: [{
-                label: 'Memory Usage %',
-                data: Array(30).fill(0),
-                borderColor: '#e63946',
-                backgroundColor: 'rgba(230, 57, 70, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: getChartOptions('Memory Usage %')
-    });
+    const memCtx = document.getElementById('memoryChart')?.getContext('2d');
+    if (memCtx) {
+        memoryChart = new Chart(memCtx, {
+            type: 'line',
+            data: {
+                labels: Array(30).fill(''),
+                datasets: [{
+                    label: 'Memory Usage %',
+                    data: Array(30).fill(0),
+                    borderColor: '#e63946',
+                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: getChartOptions('Memory Usage %')
+        });
+    }
     
     // Storage Usage Chart
-    const storageCtx = document.getElementById('storageChart').getContext('2d');
-    storageChart = new Chart(storageCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Used', 'Free'],
-            datasets: [{
-                data: [0, 100],
-                backgroundColor: ['#ff9800', '#e0e0e0'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    const storageCtx = document.getElementById('storageChart')?.getContext('2d');
+    if (storageCtx) {
+        storageChart = new Chart(storageCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Used', 'Free'],
+                datasets: [{
+                    data: [0, 100],
+                    backgroundColor: ['#ff9800', '#e0e0e0'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Network Bandwidth Chart
-    const bandwidthCtx = document.getElementById('bandwidthChart').getContext('2d');
-    bandwidthChart = new Chart(bandwidthCtx, {
-        type: 'bar',
-        data: {
-            labels: ['Download', 'Upload'],
-            datasets: [{
-                label: 'Bandwidth (KB/s)',
-                data: [0, 0],
-                backgroundColor: ['#4CAF50', '#2196F3'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
+    const bandwidthCtx = document.getElementById('bandwidthChart')?.getContext('2d');
+    if (bandwidthCtx) {
+        bandwidthChart = new Chart(bandwidthCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Download', 'Upload'],
+                datasets: [{
+                    label: 'Bandwidth (KB/s)',
+                    data: [0, 0],
+                    backgroundColor: ['#4CAF50', '#2196F3'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Start the metrics updates
     startMetricsUpdates();
@@ -233,7 +228,7 @@ function updateMetrics() {
             updateMemoryMetrics(data.memory);
             updateStorageMetrics(data.storage);
             updateBandwidthMetrics(data.bandwidth);
-            updateConnectionStatus(data.internet, data.ultima_server);
+            updateConnectionStatusIcons(data.internet, data.ultima_server);
         })
         .catch(error => {
             console.error('Error fetching metrics:', error);
@@ -251,11 +246,16 @@ function updateCPUMetrics(cpuData) {
     cpuChart.update();
     
     // Update numeric display
-    document.getElementById('cpuValue').textContent = cpuData.usage + '%';
+    const cpuValueElement = document.getElementById('cpuValue');
+    if (cpuValueElement) {
+        cpuValueElement.textContent = cpuData.usage + '%';
+    }
     
     // Update progress bar
     const progressBar = document.getElementById('cpuProgressBar');
-    progressBar.style.width = cpuData.usage + '%';
+    if (progressBar) {
+        progressBar.style.width = cpuData.usage + '%';
+    }
 }
 
 // Update Memory metrics
@@ -269,13 +269,22 @@ function updateMemoryMetrics(memData) {
     memoryChart.update();
     
     // Update numeric display
-    document.getElementById('memoryValue').textContent = memData.usage + '%';
-    document.getElementById('memoryDetails').textContent = 
-        `${memData.used}MB / ${memData.total}MB`;
+    const memoryValueElement = document.getElementById('memoryValue');
+    const memoryDetailsElement = document.getElementById('memoryDetails');
+    
+    if (memoryValueElement) {
+        memoryValueElement.textContent = memData.usage + '%';
+    }
+    
+    if (memoryDetailsElement) {
+        memoryDetailsElement.textContent = `${memData.used}MB / ${memData.total}MB`;
+    }
     
     // Update progress bar
     const progressBar = document.getElementById('memoryProgressBar');
-    progressBar.style.width = memData.usage + '%';
+    if (progressBar) {
+        progressBar.style.width = memData.usage + '%';
+    }
 }
 
 // Update Storage metrics
@@ -287,13 +296,23 @@ function updateStorageMetrics(storageData) {
     storageChart.update();
     
     // Update numeric display
-    document.getElementById('storageValue').textContent = storageData.usage + '%';
-    document.getElementById('storageDetails').textContent = 
-        `${storageData.used_formatted} / ${storageData.total_formatted}`;
+    const storageValueElement = document.getElementById('storageValue');
+    const storageDetailsElement = document.getElementById('storageDetails');
+    
+    if (storageValueElement) {
+        storageValueElement.textContent = storageData.usage + '%';
+    }
+    
+    if (storageDetailsElement) {
+        storageDetailsElement.textContent = 
+            `${storageData.used_formatted} / ${storageData.total_formatted}`;
+    }
     
     // Update progress bar
     const progressBar = document.getElementById('storageProgressBar');
-    progressBar.style.width = storageData.usage + '%';
+    if (progressBar) {
+        progressBar.style.width = storageData.usage + '%';
+    }
 }
 
 // Update Bandwidth metrics
@@ -308,77 +327,49 @@ function updateBandwidthMetrics(bandwidthData) {
     bandwidthChart.update();
     
     // Update numeric displays
-    document.getElementById('downloadValue').textContent = 
-        bandwidthData.download + ' KB/s';
-    document.getElementById('uploadValue').textContent = 
-        bandwidthData.upload + ' KB/s';
+    const downloadValueElement = document.getElementById('downloadValue');
+    const uploadValueElement = document.getElementById('uploadValue');
+    
+    if (downloadValueElement) {
+        downloadValueElement.textContent = bandwidthData.download + ' KB/s';
+    }
+    
+    if (uploadValueElement) {
+        uploadValueElement.textContent = bandwidthData.upload + ' KB/s';
+    }
 }
 
-// Update connection status indicators
-function updateConnectionStatus(internet, ultimaServer) {
+// Update connection status icons
+function updateConnectionStatusIcons(internet, ultimaServer) {
     // Internet connection
-    const internetIndicator = document.getElementById('internetStatus');
+    const internetIcon = document.getElementById('internetStatusIcon');
     const internetText = document.getElementById('internetStatusText');
     
-    if (internet.connected) {
-        internetIndicator.className = 'status-indicator status-online';
-        internetText.textContent = 'Connected';
-        internetText.style.color = '#4CAF50';
-    } else {
-        internetIndicator.className = 'status-indicator status-offline';
-        internetText.textContent = 'Disconnected';
-        internetText.style.color = '#f44336';
+    if (internetIcon && internetText) {
+        if (internet.connected) {
+            internetIcon.classList.add('connected');
+            internetText.textContent = 'Connected';
+            internetText.classList.add('connected');
+        } else {
+            internetIcon.classList.remove('connected');
+            internetText.textContent = 'Disconnected';
+            internetText.classList.remove('connected');
+        }
     }
     
     // Ultima server connection
-    const ultimaIndicator = document.getElementById('ultimaStatus');
+    const ultimaIcon = document.getElementById('ultimaStatusIcon');
     const ultimaText = document.getElementById('ultimaStatusText');
     
-    if (ultimaServer.connected) {
-        ultimaIndicator.className = 'status-indicator status-online';
-        ultimaText.textContent = 'Connected';
-        ultimaText.style.color = '#4CAF50';
-    } else {
-        ultimaIndicator.className = 'status-indicator status-offline';
-        ultimaText.textContent = 'Disconnected';
-        ultimaText.style.color = '#f44336';
-    }
-}
-
-// Check for terminal command in URL
-function checkCommandInURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('command')) {
-        openTerminal();
-    }
-}
-
-// Terminal functions
-function openTerminal() {
-    document.getElementById('terminal').style.display = 'flex';
-    document.getElementById('overlay').style.display = 'block';
-    document.getElementById('commandInput').focus();
-    
-    const terminalBody = document.getElementById('terminal-body');
-    terminalBody.scrollTop = terminalBody.scrollHeight;
-}
-
-function closeTerminal() {
-    document.getElementById('terminal').style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
-}
-
-function minimizeTerminal() {
-    closeTerminal();
-}
-
-function maximizeTerminal() {
-    const terminal = document.getElementById('terminal');
-    if (terminal.style.width === '95%' && terminal.style.height === '95%') {
-        terminal.style.width = '80%';
-        terminal.style.height = '80%';
-    } else {
-        terminal.style.width = '95%';
-        terminal.style.height = '95%';
+    if (ultimaIcon && ultimaText) {
+        if (ultimaServer.connected) {
+            ultimaIcon.classList.add('connected');
+            ultimaText.textContent = 'Connected';
+            ultimaText.classList.add('connected');
+        } else {
+            ultimaIcon.classList.remove('connected');
+            ultimaText.textContent = 'Disconnected';
+            ultimaText.classList.remove('connected');
+        }
     }
 }

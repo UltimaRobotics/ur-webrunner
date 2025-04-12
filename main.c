@@ -909,27 +909,269 @@ void render_template(char *buffer, const char *client_ip, const char *command, c
     free(processed);
 }
 
+// MQTT broker status
+typedef struct {
+    int running;
+    int client_count;
+    int messages_published;
+    int messages_received;
+} mqtt_status;
+
+// Global MQTT status
+mqtt_status mqtt_state = {0, 0, 0, 0};
+
+// Function to generate MQTT status JSON
+char* generate_mqtt_status_json() {
+    char *json = malloc(256);
+    if (!json) return NULL;
+    
+    sprintf(json, 
+        "{\n"
+        "  \"running\": %s,\n"
+        "  \"clients\": %d,\n"
+        "  \"published\": %d,\n"
+        "  \"received\": %d\n"
+        "}",
+        mqtt_state.running ? "true" : "false",
+        mqtt_state.client_count,
+        mqtt_state.messages_published,
+        mqtt_state.messages_received
+    );
+    
+    return json;
+}
+
+// Function to generate system information JSON
+char* generate_system_json() {
+    int exit_status;
+    
+    // Get OpenWRT version
+    char *version = get_openwrt_version();
+    
+    // Get kernel version
+    char *kernel = get_kernel_version();
+    
+    // Get uptime
+    char *uptime = get_uptime();
+    
+    // Get CPU info
+    char *cpu_info = execute_command("cat /proc/cpuinfo | grep 'model name' | head -1 || cat /proc/cpuinfo | grep 'cpu model' | head -1", &exit_status);
+    
+    // Format JSON
+    char *json = malloc(4096);
+    if (!json) {
+        if (cpu_info) free(cpu_info);
+        return NULL;
+    }
+    
+    // Escape strings for JSON
+    char *version_esc = json_escape_string(version);
+    char *kernel_esc = json_escape_string(kernel);
+    char *uptime_esc = json_escape_string(uptime);
+    char *cpu_esc = json_escape_string(cpu_info ? cpu_info : "Unknown");
+    
+    sprintf(json, 
+        "{\n"
+        "  \"openwrt_version\": \"%s\",\n"
+        "  \"kernel_version\": \"%s\",\n"
+        "  \"uptime\": \"%s\",\n"
+        "  \"cpu_info\": \"%s\"\n"
+        "}",
+        version_esc,
+        kernel_esc,
+        uptime_esc,
+        cpu_esc
+    );
+    
+    // Clean up
+    free(version_esc);
+    free(kernel_esc);
+    free(uptime_esc);
+    free(cpu_esc);
+    if (cpu_info) free(cpu_info);
+    
+    return json;
+}
+
+// Function to generate network information JSON
+char* generate_network_json() {
+    int exit_status;
+    
+    // Get interfaces
+    char *interfaces = execute_command("ifconfig | grep -E '^[a-zA-Z0-9]+' | awk '{print $1}'", &exit_status);
+    
+    // Get IP addresses
+    char *ip_addresses = execute_command("ifconfig | grep -E 'inet addr:|inet '", &exit_status);
+    
+    // Get routing
+    char *routing = execute_command("route -n | tail -n +3", &exit_status);
+    
+    // Format JSON
+    char *json = malloc(8192);
+    if (!json) {
+        if (interfaces) free(interfaces);
+        if (ip_addresses) free(ip_addresses);
+        if (routing) free(routing);
+        return NULL;
+    }
+    
+    // Escape strings for JSON
+    char *interfaces_esc = json_escape_string(interfaces ? interfaces : "");
+    char *ip_addresses_esc = json_escape_string(ip_addresses ? ip_addresses : "");
+    char *routing_esc = json_escape_string(routing ? routing : "");
+    
+    sprintf(json, 
+        "{\n"
+        "  \"interfaces\": \"%s\",\n"
+        "  \"ip_addresses\": \"%s\",\n"
+        "  \"routing\": \"%s\"\n"
+        "}",
+        interfaces_esc,
+        ip_addresses_esc,
+        routing_esc
+    );
+    
+    // Clean up
+    free(interfaces_esc);
+    free(ip_addresses_esc);
+    free(routing_esc);
+    if (interfaces) free(interfaces);
+    if (ip_addresses) free(ip_addresses);
+    if (routing) free(routing);
+    
+    return json;
+}
+
+// Function to generate firmware information JSON
+char* generate_firmware_json() {
+    int exit_status;
+    
+    // Get firmware details
+    char *firmware_info = execute_command("cat /etc/openwrt_release", &exit_status);
+    
+    // Get build date
+    char *build_date = execute_command("ls -l --time-style=long-iso /bin/busybox | awk '{print $6}'", &exit_status);
+    
+    // Get architecture
+    char *arch = execute_command("uname -m", &exit_status);
+    
+    // Format JSON
+    char *json = malloc(4096);
+    if (!json) {
+        if (firmware_info) free(firmware_info);
+        if (build_date) free(build_date);
+        if (arch) free(arch);
+        return NULL;
+    }
+    
+    // Escape strings for JSON
+    char *firmware_esc = json_escape_string(firmware_info ? firmware_info : "Unknown");
+    char *build_date_esc = json_escape_string(build_date ? build_date : "Unknown");
+    char *arch_esc = json_escape_string(arch ? arch : "Unknown");
+    
+    // Remove newlines
+    if (build_date_esc) {
+        char *newline = strchr(build_date_esc, '\n');
+        if (newline) *newline = '\0';
+    }
+    
+    if (arch_esc) {
+        char *newline = strchr(arch_esc, '\n');
+        if (newline) *newline = '\0';
+    }
+    
+    sprintf(json, 
+        "{\n"
+        "  \"version\": \"%s\",\n"
+        "  \"build_date\": \"%s\",\n"
+        "  \"architecture\": \"%s\",\n"
+        "  \"status\": \"stable\",\n"
+        "  \"update_available\": false\n"
+        "}",
+        get_openwrt_version(),
+        build_date_esc,
+        arch_esc
+    );
+    
+    // Clean up
+    free(firmware_esc);
+    free(build_date_esc);
+    free(arch_esc);
+    if (firmware_info) free(firmware_info);
+    if (build_date) free(build_date);
+    if (arch) free(arch);
+    
+    return json;
+}
+
+// Start MQTT broker
+int start_mqtt_broker() {
+    // In a real implementation, this would start the MQTT broker
+    // Here we just simulate it
+    mqtt_state.running = 1;
+    mqtt_state.client_count = 0;
+    mqtt_state.messages_published = 0;
+    mqtt_state.messages_received = 0;
+    
+    return 1; // Success
+}
+
+// Stop MQTT broker
+int stop_mqtt_broker() {
+    // In a real implementation, this would stop the MQTT broker
+    // Here we just simulate it
+    mqtt_state.running = 0;
+    
+    return 1; // Success
+}
+
 // Function to handle API requests
 void handle_api_request(int socket, const char *path) {
+    char *json = NULL;
+    int success = 0;
+    
+    // Extract the API endpoint
     if (strcmp(path, "/api/metrics") == 0) {
         // Generate metrics JSON
-        char *metrics_json = generate_metrics_json();
-        if (!metrics_json) {
-            char error_response[] = 
-                "HTTP/1.1 500 Internal Server Error\r\n"
-                "Content-Type: application/json\r\n"
-                "Content-Length: 35\r\n"
-                "\r\n"
-                "{\"error\":\"Failed to generate metrics\"}";
-            
-            send(socket, error_response, strlen(error_response), 0);
-            return;
-        }
-        
+        json = generate_metrics_json();
+        success = (json != NULL);
+    }
+    else if (strcmp(path, "/api/system") == 0) {
+        // Generate system info JSON
+        json = generate_system_json();
+        success = (json != NULL);
+    }
+    else if (strcmp(path, "/api/network") == 0) {
+        // Generate network info JSON
+        json = generate_network_json();
+        success = (json != NULL);
+    }
+    else if (strcmp(path, "/api/firmware") == 0) {
+        // Generate firmware info JSON
+        json = generate_firmware_json();
+        success = (json != NULL);
+    }
+    else if (strcmp(path, "/api/mqtt/status") == 0) {
+        // Generate MQTT status JSON
+        json = generate_mqtt_status_json();
+        success = (json != NULL);
+    }
+    else if (strcmp(path, "/api/mqtt/start") == 0) {
+        // Start MQTT broker
+        success = start_mqtt_broker();
+        json = strdup("{ \"success\": true }");
+    }
+    else if (strcmp(path, "/api/mqtt/stop") == 0) {
+        // Stop MQTT broker
+        success = stop_mqtt_broker();
+        json = strdup("{ \"success\": true }");
+    }
+    
+    if (success && json) {
         // Prepare the response header
-        char *response = malloc(strlen(metrics_json) + 256);
+        char *response = malloc(strlen(json) + 256);
         if (!response) {
-            free(metrics_json);
+            free(json);
             char error_response[] = 
                 "HTTP/1.1 500 Internal Server Error\r\n"
                 "Content-Type: application/json\r\n"
@@ -944,22 +1186,24 @@ void handle_api_request(int socket, const char *path) {
         sprintf(response,
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: application/json\r\n"
+            "Access-Control-Allow-Origin: *\r\n"  // Add CORS header for API
             "Content-Length: %zu\r\n"
             "\r\n"
-            "%s", strlen(metrics_json), metrics_json);
+            "%s", strlen(json), json);
         
         // Send the response
         send(socket, response, strlen(response), 0);
         
         // Clean up
-        free(metrics_json);
+        free(json);
         free(response);
     }
     else {
-        // Unknown API endpoint
+        // Unknown API endpoint or error
         char error_response[] = 
             "HTTP/1.1 404 Not Found\r\n"
             "Content-Type: application/json\r\n"
+            "Access-Control-Allow-Origin: *\r\n"  // Add CORS header for API
             "Content-Length: 44\r\n"
             "\r\n"
             "{\"error\":\"The requested API was not found\"}";
