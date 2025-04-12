@@ -281,7 +281,12 @@ void generate_dynamic_html(char *buffer, const char *client_ip, const char *comm
     char *system_info = get_system_info();
     char *network_info = get_network_info();
     
-    snprintf(buffer, BUFFER_SIZE,
+    // Start with HTTP headers and beginning of HTML
+    char *p = buffer;
+    int remaining = BUFFER_SIZE;
+    int written;
+    
+    written = snprintf(p, remaining,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "\r\n"
@@ -737,7 +742,7 @@ void generate_dynamic_html(char *buffer, const char *client_ip, const char *comm
         "        <div class=\"terminal-body\" id=\"terminal-body\">\n"
         "            <div class=\"terminal-prompt\">Welcome to OpenWRT Terminal</div>\n"
         "            <div class=\"terminal-prompt\">Type 'help' for a list of common commands</div>\n",
-        client_ip, ctime(&now), system_info, network_info);
+        client_ip, ctime(&now), system_info, network_info, network_info, system_info);
     
     // Add command history if any
     if (history_count > 0) {
