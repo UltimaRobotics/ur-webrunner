@@ -1,19 +1,16 @@
-# Makefile for OpenWRT Management Interface
-
-CC = gcc
-CFLAGS = -Wall -Wextra -O2
-TARGET = openwrt_management
-SRC = main.c
+CC=gcc
+CFLAGS=-Wall -Wextra -O2
+TARGET=openwrt_management
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
+$(TARGET): main.c
+	$(CC) $(CFLAGS) -o $(TARGET) main.c
 
 clean:
 	rm -f $(TARGET)
 
-install:
-	install -m 755 $(TARGET) /usr/bin/
+run: $(TARGET)
+	./$(TARGET)
 
-.PHONY: all clean install
+.PHONY: all clean run
