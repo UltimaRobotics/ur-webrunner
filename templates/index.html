@@ -336,7 +336,7 @@
                             <div class="option-icon"><i class="fas fa-cloud-download-alt"></i></div>
                             <div class="option-title">Online Update</div>
                             <div class="option-description">Update firmware directly from the OpenWRT repositories</div>
-                            <button class="option-btn">Start Online Update</button>
+                            <button id="online-update-btn" class="option-btn">Start Online Update</button>
                         </div>
                         
                         <div class="option-card">
@@ -351,14 +351,199 @@
                             <div class="option-icon"><i class="fas fa-save"></i></div>
                             <div class="option-title">Backup Settings</div>
                             <div class="option-description">Create a backup of your current configuration</div>
-                            <button class="option-btn">Create Backup</button>
+                            <button id="backup-settings-btn" class="option-btn">Create Backup</button>
                         </div>
                         
                         <div class="option-card">
                             <div class="option-icon"><i class="fas fa-undo"></i></div>
                             <div class="option-title">Factory Reset</div>
                             <div class="option-description">Reset device to factory default settings</div>
-                            <button class="option-btn danger-btn">Factory Reset</button>
+                            <button id="factory-reset-btn" class="option-btn danger-btn">Factory Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Developer Tab -->
+            <div id="developer" class="tab-content">
+                <div class="card">
+                    <h2><i class="fas fa-code-branch"></i> Ultima Robotics Developer</h2>
+                    
+                    <!-- GitHub Integration Section -->
+                    <div class="dev-section">
+                        <h3><i class="fab fa-github"></i> GitHub Integration</h3>
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label for="github-repo">Repository URL</label>
+                                <input type="text" id="github-repo" placeholder="https://github.com/username/repository">
+                            </div>
+                            <div class="form-group">
+                                <label for="github-token">Access Token</label>
+                                <input type="password" id="github-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                            </div>
+                            <div class="form-group">
+                                <label for="github-branch">Branch</label>
+                                <input type="text" id="github-branch" placeholder="main" value="main">
+                            </div>
+                            <div class="form-actions">
+                                <button class="action-btn" id="github-test-btn"><i class="fas fa-vial"></i> Test Connection</button>
+                                <button class="action-btn" id="github-save-btn"><i class="fas fa-save"></i> Save</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Package Management Section -->
+                    <div class="dev-section">
+                        <h3><i class="fas fa-box"></i> Package Management</h3>
+                        <div class="dev-package-list">
+                            <div class="package-header">
+                                <div class="package-name">Package Name</div>
+                                <div class="package-version">Version</div>
+                                <div class="package-actions">Actions</div>
+                            </div>
+                            <div class="package-item">
+                                <div class="package-name">openwrt-core</div>
+                                <div class="package-version">1.2.3</div>
+                                <div class="package-actions">
+                                    <button class="action-btn"><i class="fas fa-sync-alt"></i> Update</button>
+                                    <button class="action-btn danger-btn"><i class="fas fa-trash-alt"></i> Remove</button>
+                                </div>
+                            </div>
+                            <div class="package-item">
+                                <div class="package-name">ultima-api</div>
+                                <div class="package-version">0.9.5</div>
+                                <div class="package-actions">
+                                    <button class="action-btn"><i class="fas fa-sync-alt"></i> Update</button>
+                                    <button class="action-btn danger-btn"><i class="fas fa-trash-alt"></i> Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label for="package-url">Package URL</label>
+                                <input type="text" id="package-url" placeholder="https://example.com/package.ipk">
+                            </div>
+                            <div class="form-actions">
+                                <button class="action-btn" id="package-add-btn"><i class="fas fa-plus"></i> Add Package</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- VPN Management Section -->
+                    <div class="dev-section">
+                        <h3><i class="fas fa-shield-alt"></i> OpenVPN Management</h3>
+                        <div class="vpn-status">
+                            <div class="status-badge offline">Disconnected</div>
+                        </div>
+                        <div class="dev-form">
+                            <div class="form-group file-upload">
+                                <label for="vpn-config">Configuration File</label>
+                                <div class="file-input-container">
+                                    <input type="file" id="vpn-config" class="file-input">
+                                    <div class="file-input-trigger">
+                                        <i class="fas fa-file-upload"></i> Browse File
+                                    </div>
+                                    <div class="file-input-name">No file selected</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="vpn-username">Username (Optional)</label>
+                                <input type="text" id="vpn-username" placeholder="VPN Username">
+                            </div>
+                            <div class="form-group">
+                                <label for="vpn-password">Password (Optional)</label>
+                                <input type="password" id="vpn-password" placeholder="VPN Password">
+                            </div>
+                            <div class="form-actions">
+                                <button class="action-btn" id="vpn-connect-btn"><i class="fas fa-plug"></i> Connect</button>
+                                <button class="action-btn danger-btn" id="vpn-disconnect-btn" disabled><i class="fas fa-times"></i> Disconnect</button>
+                                <button class="action-btn" id="vpn-test-btn"><i class="fas fa-vial"></i> Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- QMI Modem Management -->
+                    <div class="dev-section">
+                        <h3><i class="fas fa-broadcast-tower"></i> QMI Modem Management</h3>
+                        <div class="modem-status">
+                            <div class="status-row">
+                                <div class="status-label">Status:</div>
+                                <div class="status-value"><span class="status-badge offline">Not Connected</span></div>
+                            </div>
+                            <div class="status-row">
+                                <div class="status-label">Signal Strength:</div>
+                                <div class="status-value">
+                                    <div class="signal-bars">
+                                        <div class="bar"></div>
+                                        <div class="bar"></div>
+                                        <div class="bar"></div>
+                                        <div class="bar"></div>
+                                        <div class="bar"></div>
+                                    </div>
+                                    <span class="signal-value">0%</span>
+                                </div>
+                            </div>
+                            <div class="status-row">
+                                <div class="status-label">Network Type:</div>
+                                <div class="status-value">--</div>
+                            </div>
+                            <div class="status-row">
+                                <div class="status-label">Operator:</div>
+                                <div class="status-value">--</div>
+                            </div>
+                            <div class="status-row">
+                                <div class="status-label">IMEI:</div>
+                                <div class="status-value">--</div>
+                            </div>
+                        </div>
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label for="modem-apn">APN</label>
+                                <input type="text" id="modem-apn" placeholder="internet">
+                            </div>
+                            <div class="form-group">
+                                <label for="modem-username">Username (Optional)</label>
+                                <input type="text" id="modem-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label for="modem-password">Password (Optional)</label>
+                                <input type="password" id="modem-password" placeholder="Password">
+                            </div>
+                            <div class="form-actions">
+                                <button class="action-btn" id="modem-connect-btn"><i class="fas fa-plug"></i> Connect</button>
+                                <button class="action-btn danger-btn" id="modem-disconnect-btn" disabled><i class="fas fa-times"></i> Disconnect</button>
+                                <button class="action-btn" id="modem-refresh-btn"><i class="fas fa-sync-alt"></i> Refresh Status</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- USB Tethering Management -->
+                    <div class="dev-section">
+                        <h3><i class="fas fa-usb"></i> USB Tethering</h3>
+                        <div class="tethering-status">
+                            <div class="status-row">
+                                <div class="status-label">Device:</div>
+                                <div class="status-value">No device connected</div>
+                            </div>
+                            <div class="status-row">
+                                <div class="status-label">Status:</div>
+                                <div class="status-value"><span class="status-badge offline">Inactive</span></div>
+                            </div>
+                        </div>
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label>USB Devices</label>
+                                <select id="usb-device-select">
+                                    <option value="">Select USB Device</option>
+                                    <option value="device1">Android Device (0x18d1:0x4ee7)</option>
+                                    <option value="device2">iPhone (0x05ac:0x12a8)</option>
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button class="action-btn" id="tethering-enable-btn"><i class="fas fa-plug"></i> Enable Tethering</button>
+                                <button class="action-btn danger-btn" id="tethering-disable-btn" disabled><i class="fas fa-times"></i> Disable Tethering</button>
+                                <button class="action-btn" id="tethering-scan-btn"><i class="fas fa-search"></i> Scan USB Devices</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -459,161 +644,406 @@
         </div>
     </div>
     
-    <!-- API Docs Popup -->
-    <div class="overlay" id="apiDocsOverlay"></div>
-    <div class="popup wide-popup" id="apiDocsPopup">
-        <div class="popup-header">
-            <h3 class="popup-title"><i class="fas fa-code"></i> API Documentation</h3>
-            <div class="popup-close" id="apiDocsClose">&times;</div>
+    <!-- Factory Reset Popup -->
+    <div class="overlay" id="factoryResetOverlay"></div>
+    <div class="popup" id="factoryResetPopup">
+        <div class="popup-header warning-header">
+            <h3 class="popup-title"><i class="fas fa-exclamation-triangle"></i> Factory Reset</h3>
+            <div class="popup-close" id="factoryResetClose">&times;</div>
         </div>
         <div class="popup-body">
-            <div class="api-docs-content">
-                <div class="api-section">
-                    <h3>REST API Endpoints</h3>
-                    <div class="api-endpoint">
-                        <div class="http-method get">GET</div>
-                        <div class="endpoint-path">/api/metrics</div>
-                        <div class="endpoint-description">Get real-time system metrics</div>
-                    </div>
-                    <div class="api-endpoint">
-                        <div class="http-method get">GET</div>
-                        <div class="endpoint-path">/api/system</div>
-                        <div class="endpoint-description">Get system information</div>
-                    </div>
-                    <div class="api-endpoint">
-                        <div class="http-method get">GET</div>
-                        <div class="endpoint-path">/api/network</div>
-                        <div class="endpoint-description">Get network configuration</div>
-                    </div>
-                    <div class="api-endpoint">
-                        <div class="http-method get">GET</div>
-                        <div class="endpoint-path">/api/firmware</div>
-                        <div class="endpoint-description">Get firmware information</div>
-                    </div>
-                    <div class="api-endpoint">
-                        <div class="http-method post">POST</div>
-                        <div class="endpoint-path">/api/services/:service/:action</div>
-                        <div class="endpoint-description">Control system services (start/stop/restart)</div>
-                    </div>
+            <div class="warning-content">
+                <div class="warning-icon">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="warning-message">
+                    <h4>Warning: This action cannot be undone!</h4>
+                    <p>Factory reset will erase all settings and data from your device and restore it to its original state. This includes:</p>
+                    <ul class="warning-list">
+                        <li>All network configuration</li>
+                        <li>All user accounts and passwords</li>
+                        <li>All installed packages and applications</li>
+                        <li>All custom settings and preferences</li>
+                    </ul>
+                    <p>Your device will restart during this process and may be unavailable for several minutes.</p>
+                </div>
+            </div>
+            
+            <div class="confirmation-box">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="confirmResetCheckbox">
+                    <label for="confirmResetCheckbox">I understand that this action cannot be undone</label>
                 </div>
                 
-                <div class="api-section">
-                    <h3>MQTT Integration</h3>
-                    <div class="mqtt-info">
-                        <p>Connect to the MQTT broker running on this OpenWRT device to receive real-time updates:</p>
-                        <pre>Host: {{client_ip}}
-Port: 1883
-Username: openwrt
-Password: [Set in MQTT configuration]</pre>
-                    </div>
-                    
-                    <h4>Available Topics</h4>
-                    <div class="mqtt-topics">
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/metrics</div>
-                            <div class="topic-description">Real-time system metrics updated every 5 seconds</div>
-                        </div>
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/network/status</div>
-                            <div class="topic-description">Network status changes (online/offline)</div>
-                        </div>
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/services/+/status</div>
-                            <div class="topic-description">Service status changes</div>
-                        </div>
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/firmware/updates</div>
-                            <div class="topic-description">Firmware update notifications</div>
-                        </div>
-                    </div>
-                    
-                    <h4>Control Topics (Publish To)</h4>
-                    <div class="mqtt-topics">
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/services/+/control</div>
-                            <div class="topic-description">Control services (payload: "start", "stop", "restart")</div>
-                        </div>
-                        <div class="topic-item">
-                            <div class="topic-path">openwrt/system/reboot</div>
-                            <div class="topic-description">Reboot the system (payload: "1")</div>
-                        </div>
-                    </div>
+                <div class="password-confirmation">
+                    <label for="adminPasswordReset">Administrator Password</label>
+                    <input type="password" id="adminPasswordReset" placeholder="Enter password to confirm">
                 </div>
                 
-                <div class="api-section">
-                    <h3>Example JSON Payloads</h3>
-                    <div class="json-example">
-                        <h4>GET /api/metrics</h4>
-                        <pre>{
-  "cpu": {
-    "usage": 12.5
-  },
-  "memory": {
-    "total": 512,
-    "used": 128,
-    "usage": 25.0
-  },
-  "storage": {
-    "total": 1024,
-    "used": 512,
-    "free": 512,
-    "usage": 50.0,
-    "used_formatted": "512 MB",
-    "total_formatted": "1.0 GB"
-  },
-  "bandwidth": {
-    "download": 1.2,
-    "upload": 0.4
-  },
-  "internet": {
-    "connected": true
-  },
-  "ultima_server": {
-    "connected": true
-  }
-}</pre>
-                    </div>
+                <div class="action-buttons">
+                    <button class="secondary-btn" id="cancelResetBtn">Cancel</button>
+                    <button class="danger-btn" id="confirmResetBtn" disabled>Reset Device</button>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- MQTT Status Popup -->
-    <div class="overlay" id="mqttStatusOverlay"></div>
-    <div class="popup" id="mqttStatusPopup">
+    <!-- Backup Settings Popup -->
+    <div class="overlay" id="backupSettingsOverlay"></div>
+    <div class="popup" id="backupSettingsPopup">
         <div class="popup-header">
-            <h3 class="popup-title"><i class="fas fa-sync-alt"></i> MQTT Status</h3>
-            <div class="popup-close" id="mqttStatusClose">&times;</div>
+            <h3 class="popup-title"><i class="fas fa-save"></i> Backup Settings</h3>
+            <div class="popup-close" id="backupSettingsClose">&times;</div>
         </div>
         <div class="popup-body">
-            <div class="mqtt-status-content">
-                <div class="status-indicator-large" id="mqttConnectionStatus">
-                    <i class="fas fa-times-circle"></i>
-                    <span>Disconnected</span>
+            <div class="backup-content">
+                <div class="backup-options">
+                    <h4>Select Backup Options</h4>
+                    <div class="options-grid">
+                        <div class="option-item">
+                            <input type="checkbox" id="backupSystem" checked>
+                            <label for="backupSystem">System Configuration</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupNetwork" checked>
+                            <label for="backupNetwork">Network Settings</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupFirewall" checked>
+                            <label for="backupFirewall">Firewall Rules</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupServices" checked>
+                            <label for="backupServices">Service Configuration</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupPackages">
+                            <label for="backupPackages">Installed Packages</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupData">
+                            <label for="backupData">User Data</label>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="mqtt-stats">
-                    <div class="stat-item">
-                        <div class="stat-label">Broker Address</div>
-                        <div class="stat-value" id="mqttBrokerAddress">{{client_ip}}:1883</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Connected Clients</div>
-                        <div class="stat-value" id="mqttClientCount">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Messages Published</div>
-                        <div class="stat-value" id="mqttPublishedCount">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Messages Received</div>
-                        <div class="stat-value" id="mqttReceivedCount">0</div>
+                <div class="backup-password">
+                    <h4>Encrypt Backup (Optional)</h4>
+                    <p>For added security, you can encrypt your backup with a password.</p>
+                    <div class="password-fields">
+                        <div class="form-group">
+                            <label for="backupPassword">Password</label>
+                            <input type="password" id="backupPassword" placeholder="Enter password">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmBackupPassword">Confirm Password</label>
+                            <input type="password" id="confirmBackupPassword" placeholder="Confirm password">
+                        </div>
                     </div>
                 </div>
                 
-                <div class="mqtt-controls">
-                    <button id="startMqttButton" class="action-btn start-btn">Start MQTT Broker</button>
-                    <button id="stopMqttButton" class="action-btn stop-btn" disabled>Stop MQTT Broker</button>
+                <div class="backup-name">
+                    <h4>Backup File Name</h4>
+                    <div class="form-group">
+                        <input type="text" id="backupFileName" value="openwrt-backup-{{server_time}}">
+                    </div>
+                </div>
+                
+                <div class="backup-actions">
+                    <div class="backup-progress">
+                        <div class="progress-bar" id="backupProgressBar"></div>
+                    </div>
+                    <button class="primary-btn" id="startBackupBtn">Create Backup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Online Update Popup -->
+    <div class="overlay" id="onlineUpdateOverlay"></div>
+    <div class="popup" id="onlineUpdatePopup">
+        <div class="popup-header">
+            <h3 class="popup-title"><i class="fas fa-cloud-download-alt"></i> Online Update</h3>
+            <div class="popup-close" id="onlineUpdateClose">&times;</div>
+        </div>
+        <div class="popup-body">
+            <div class="update-content">
+                <div class="update-source">
+                    <h4>Update Source</h4>
+                    <div class="source-options">
+                        <div class="source-option">
+                            <input type="radio" name="updateSource" id="sourceOfficial" checked>
+                            <label for="sourceOfficial">Official OpenWRT Repository</label>
+                        </div>
+                        <div class="source-option">
+                            <input type="radio" name="updateSource" id="sourceGithub">
+                            <label for="sourceGithub">GitHub Repository</label>
+                        </div>
+                    </div>
+                    
+                    <div id="githubSourceOptions" class="github-options" style="display: none;">
+                        <div class="form-group">
+                            <label for="githubRepoUrl">Repository URL</label>
+                            <input type="text" id="githubRepoUrl" placeholder="https://github.com/username/repo">
+                        </div>
+                        <div class="form-group">
+                            <label for="githubBranch">Branch/Tag</label>
+                            <input type="text" id="githubBranch" placeholder="main" value="main">
+                        </div>
+                        <div class="form-group">
+                            <label for="githubToken">Access Token (optional)</label>
+                            <input type="password" id="githubToken" placeholder="GitHub token for private repos">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="update-options">
+                    <h4>Update Options</h4>
+                    <div class="options-list">
+                        <div class="option-item">
+                            <input type="checkbox" id="preserveSettings" checked>
+                            <label for="preserveSettings">Preserve Settings</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="backupBeforeUpdate" checked>
+                            <label for="backupBeforeUpdate">Create Backup Before Update</label>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" id="updatePackages">
+                            <label for="updatePackages">Update All Packages</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="update-releases" id="availableUpdates">
+                    <h4>Available Updates</h4>
+                    <div class="loading-indicator">
+                        <div class="spinner"></div>
+                        <span>Checking for updates...</span>
+                    </div>
+                </div>
+                
+                <div class="update-steps">
+                    <div class="step" data-step="1">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Check for Updates</div>
+                            <div class="step-status">Pending</div>
+                        </div>
+                    </div>
+                    <div class="step" data-step="2">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Download Firmware</div>
+                            <div class="step-status">Pending</div>
+                        </div>
+                    </div>
+                    <div class="step" data-step="3">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Verify Package</div>
+                            <div class="step-status">Pending</div>
+                        </div>
+                    </div>
+                    <div class="step" data-step="4">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Install Update</div>
+                            <div class="step-status">Pending</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="update-progress">
+                    <div class="progress-bar" id="updateProgressBar"></div>
+                    <div class="progress-status" id="updateProgressStatus">Ready to start</div>
+                </div>
+                
+                <div class="update-actions">
+                    <button class="secondary-btn" id="checkUpdatesBtn">Check for Updates</button>
+                    <button class="primary-btn" id="startUpdateBtn" disabled>Start Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Developer Popup -->
+    <div class="overlay" id="developerOverlay"></div>
+    <div class="popup wide-popup" id="developerPopup">
+        <div class="popup-header">
+            <h3 class="popup-title"><i class="fas fa-code"></i> Developer Settings</h3>
+            <div class="popup-close" id="developerClose">&times;</div>
+        </div>
+        <div class="popup-body">
+            <div class="dev-content">
+                <div class="dev-tabs">
+                    <div class="dev-tab active" data-tab="mqtt">MQTT Integration</div>
+                    <div class="dev-tab" data-tab="json">JSON Schemas</div>
+                    <div class="dev-tab" data-tab="api">REST API</div>
+                    <div class="dev-tab" data-tab="debug">Debug Tools</div>
+                </div>
+                
+                <div class="dev-tab-content">
+                    <div class="tab-pane active" id="mqttTab">
+                        <h4>MQTT Configuration</h4>
+                        <p>Configure the MQTT broker settings for system integration:</p>
+                        
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label for="mqttPort">MQTT Port</label>
+                                <input type="number" id="mqttPort" value="1883" min="1024" max="65535">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="mqttUsername">Username</label>
+                                <input type="text" id="mqttUsername" value="openwrt">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="mqttPassword">Password</label>
+                                <input type="password" id="mqttPassword" placeholder="Set broker password">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="mqttRetention">Message Retention (days)</label>
+                                <input type="number" id="mqttRetention" value="7" min="1" max="30">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Authentication</label>
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="mqttAuthRequired" checked>
+                                    <label for="mqttAuthRequired">Require authentication</label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button class="action-btn" id="saveMqttConfigBtn"><i class="fas fa-save"></i> Save</button>
+                                <button class="action-btn" id="testMqttConfigBtn"><i class="fas fa-vial"></i> Test</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" id="jsonTab">
+                        <h4>JSON Schema Configuration</h4>
+                        <p>Configure the JSON schemas used for data exchange:</p>
+                        
+                        <div class="schema-list">
+                            <div class="schema-item">
+                                <div class="schema-name">Metrics Schema</div>
+                                <div class="schema-actions">
+                                    <button class="action-btn"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="action-btn"><i class="fas fa-eye"></i> View</button>
+                                </div>
+                            </div>
+                            <div class="schema-item">
+                                <div class="schema-name">Network Schema</div>
+                                <div class="schema-actions">
+                                    <button class="action-btn"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="action-btn"><i class="fas fa-eye"></i> View</button>
+                                </div>
+                            </div>
+                            <div class="schema-item">
+                                <div class="schema-name">Firmware Schema</div>
+                                <div class="schema-actions">
+                                    <button class="action-btn"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="action-btn"><i class="fas fa-eye"></i> View</button>
+                                </div>
+                            </div>
+                            <div class="schema-item">
+                                <div class="schema-name">System Schema</div>
+                                <div class="schema-actions">
+                                    <button class="action-btn"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="action-btn"><i class="fas fa-eye"></i> View</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" id="apiTab">
+                        <h4>REST API Configuration</h4>
+                        <p>Configure the REST API for external communications:</p>
+                        
+                        <div class="dev-form">
+                            <div class="form-group">
+                                <label>API Access</label>
+                                <div class="radio-group">
+                                    <div class="radio-option">
+                                        <input type="radio" name="apiAccess" id="apiAccessPublic">
+                                        <label for="apiAccessPublic">Public</label>
+                                    </div>
+                                    <div class="radio-option">
+                                        <input type="radio" name="apiAccess" id="apiAccessToken" checked>
+                                        <label for="apiAccessToken">Token-based</label>
+                                    </div>
+                                    <div class="radio-option">
+                                        <input type="radio" name="apiAccess" id="apiAccessDisabled">
+                                        <label for="apiAccessDisabled">Disabled</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="apiRateLimit">Rate Limit (requests/minute)</label>
+                                <input type="number" id="apiRateLimit" value="60" min="10" max="1000">
+                            </div>
+                            
+                            <div class="token-management">
+                                <h5>API Tokens</h5>
+                                <div class="token-list">
+                                    <div class="token-item">
+                                        <div class="token-name">Default Token</div>
+                                        <div class="token-value">••••••••••••••••</div>
+                                        <div class="token-actions">
+                                            <button class="action-btn"><i class="fas fa-eye"></i> Show</button>
+                                            <button class="action-btn"><i class="fas fa-sync-alt"></i> Regenerate</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="add-token-btn"><i class="fas fa-plus"></i> Add New Token</button>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button class="action-btn" id="saveApiConfigBtn"><i class="fas fa-save"></i> Save</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" id="debugTab">
+                        <h4>Debug Tools</h4>
+                        <p>Developer tools for debugging and testing:</p>
+                        
+                        <div class="debug-tools">
+                            <div class="tool-card">
+                                <div class="tool-icon"><i class="fas fa-bug"></i></div>
+                                <div class="tool-title">Debug Logs</div>
+                                <button class="action-btn">Open Logs</button>
+                            </div>
+                            
+                            <div class="tool-card">
+                                <div class="tool-icon"><i class="fas fa-terminal"></i></div>
+                                <div class="tool-title">Command Line</div>
+                                <button class="action-btn">Open Terminal</button>
+                            </div>
+                            
+                            <div class="tool-card">
+                                <div class="tool-icon"><i class="fas fa-network-wired"></i></div>
+                                <div class="tool-title">Network Tools</div>
+                                <button class="action-btn">Open Tools</button>
+                            </div>
+                            
+                            <div class="tool-card">
+                                <div class="tool-icon"><i class="fas fa-database"></i></div>
+                                <div class="tool-title">Database Viewer</div>
+                                <button class="action-btn">Open Viewer</button>
+                            </div>
+                        </div>
+                        
+                        <div class="system-info">
+                            <h5>System Debug Info</h5>
+                            <pre id="debugSystemInfo">Loading system info...</pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
