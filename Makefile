@@ -1,12 +1,12 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -O2
+CFLAGS=-Wall -Wextra -O2 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-unused-variable -Wno-unused-function -Wno-unused-result -Wno-sign-compare -Wno-format
 TARGET=openwrt_management
 LDFLAGS=
 
 all: $(TARGET)
 
 $(TARGET): main.c
-	$(CC) $(CFLAGS) -o $(TARGET) main.c $(LDFLAGS)
+	$(CC) $(CFLAGS) -I. -o $(TARGET) main.c ur_management.c $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
